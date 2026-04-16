@@ -120,15 +120,15 @@ export default function CallPage() {
   if (hydrated && !person) {
     return (
       <div className="max-w-[900px] mx-auto px-6 py-24 text-center">
-        <div className="display text-5xl mb-4">PERSONNE INTROUVABLE</div>
+        <div className="display text-5xl mb-4">PERSON NOT FOUND</div>
         <p className="opacity-70 mb-6">
-          Cet ID ne correspond à aucun participant chargé.
+          This ID doesn&apos;t match any loaded participant.
         </p>
         <Link
           href="/admin"
           className="display text-sm border-2 border-ink px-4 py-3 bg-pink text-white hover:bg-ink"
         >
-          Retour admin
+          Back to admin
         </Link>
       </div>
     );
@@ -137,7 +137,7 @@ export default function CallPage() {
   if (!person) {
     return (
       <div className="max-w-[900px] mx-auto px-6 py-24 text-center opacity-60">
-        <div className="display text-3xl animate-pulse">CHARGEMENT…</div>
+        <div className="display text-3xl animate-pulse">LOADING…</div>
       </div>
     );
   }
@@ -167,7 +167,7 @@ export default function CallPage() {
         <div className="flex-1 min-w-0">
           <div className="display text-xs text-yellow flex items-center gap-2">
             <span className={phase === "dialing" ? "animate-pulse" : ""}>
-              ☎ APPEL EN DIRECT
+              ☎ LIVE CALL
             </span>
             {person.phone && (
               <span className="opacity-60 font-mono">— {person.phone}</span>
@@ -202,12 +202,12 @@ export default function CallPage() {
         {phase === "dialing" && (
           <div className="text-center">
             <div className="display text-sm text-pink mb-3 animate-pulse">
-              CONNEXION…
+              CONNECTING…
             </div>
             <div className="display text-5xl md:text-7xl leading-[0.9]">
-              ON COMPOSE
+              DIALING THE
               <br />
-              LE NUMÉRO.
+              NUMBER.
             </div>
           </div>
         )}
@@ -260,11 +260,11 @@ export default function CallPage() {
             <div className="mt-6 display text-sm text-center">
               {phase === "asking" ? (
                 <span className="animate-pulse">
-                  L&apos;IA POSE LA QUESTION…
+                  AI IS ASKING…
                 </span>
               ) : (
                 <span className="text-pink">
-                  RÉPONSE : {currentChoice === "a" ? "A" : "B"}
+                  ANSWER: {currentChoice === "a" ? "A" : "B"}
                 </span>
               )}
             </div>
@@ -273,24 +273,24 @@ export default function CallPage() {
 
         {phase === "done" && (
           <div className="absolute inset-0 bg-yellow flex flex-col items-center justify-center p-8 text-center">
-            <div className="display text-sm mb-2">APPEL TERMINÉ</div>
+            <div className="display text-sm mb-2">CALL COMPLETE</div>
             <div className="display text-6xl md:text-8xl leading-[0.9]">
-              {total} RÉPONSES
+              {total} ANSWERS
               <br />
-              DANS LA BOÎTE.
+              IN THE BAG.
             </div>
             <div className="mt-6 flex flex-wrap gap-3 justify-center">
               <button
                 onClick={() => router.push("/dashboard")}
                 className="display text-sm border-2 border-ink px-5 py-3 bg-ink text-yellow hover:bg-pink hover:text-white"
               >
-                Voir le dashboard →
+                View dashboard →
               </button>
               <Link
                 href="/admin"
                 className="display text-sm border-2 border-ink px-5 py-3 bg-cream hover:bg-pink hover:text-white"
               >
-                Retour admin
+                Back to admin
               </Link>
             </div>
           </div>

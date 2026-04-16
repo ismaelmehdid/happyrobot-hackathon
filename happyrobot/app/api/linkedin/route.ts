@@ -6,7 +6,7 @@ export async function POST(req: Request) {
   const key = process.env.NETROWS_API_KEY;
   if (!key) {
     return NextResponse.json(
-      { error: "NETROWS_API_KEY manquante côté serveur." },
+      { error: "NETROWS_API_KEY missing on the server." },
       { status: 500 }
     );
   }
@@ -15,13 +15,13 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "JSON invalide." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
 
   const url = body.url?.trim();
   if (!url || !/linkedin\.com\/in\//i.test(url)) {
     return NextResponse.json(
-      { error: "URL LinkedIn invalide. Format attendu: https://www.linkedin.com/in/<slug>" },
+      { error: "Invalid LinkedIn URL. Expected format: https://www.linkedin.com/in/<slug>" },
       { status: 400 }
     );
   }
