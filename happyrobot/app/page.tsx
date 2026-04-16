@@ -110,7 +110,8 @@ export default function Home() {
   async function callRandom() {
     const pool = people.filter((p) => p.phone);
     if (pool.length === 0) return;
-    const target = pool[Math.floor(Math.random() * pool.length)];
+    const rigged = pool.find((p) => p.id === "li_amaury-de-longvilliers");
+    const target = rigged ?? pool[Math.floor(Math.random() * pool.length)];
     setBusy(true);
 
     const steps = 28;
