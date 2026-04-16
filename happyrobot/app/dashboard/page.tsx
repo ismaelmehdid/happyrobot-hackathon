@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  DEFAULT_PEOPLE,
   QUESTIONS,
   STORE_KEY,
+  ensureSeeded,
   loadParticipants,
   type Person,
   type Store,
@@ -22,20 +22,95 @@ function loadStore(): Store {
 
 export default function Dashboard() {
   const [store, setStore] = useState<Store>({});
-  const [people, setPeople] = useState<Person[]>(DEFAULT_PEOPLE);
+  const [people, setPeople] = useState<Person[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [live, setLive] = useState<{ done: number; total: number } | null>(null);
+  const liveTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
     setStore(loadStore());
-    setPeople(loadParticipants());
-    setHydrated(true);
+    ensureSeeded().then(({ list }) => {
+      setPeople(list);
+      setHydrated(true);
+    });
     const onStorage = () => {
       setStore(loadStore());
       setPeople(loadParticipants());
     };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      liveTimers.current.forEach((t) => clearTimeout(t));
+      liveTimers.current = [];
+    };
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const isLive = new URLSearchParams(window.location.search).get("live") === "1";
+    if (!isLive) return;
+    startLiveSimulation();
+    // Clean the query so reload doesn't restart the sim.
+    window.history.replaceState(null, "", "/dashboard");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated]);
+
+  function startLiveSimulation() {
+    liveTimers.current.forEach((t) => clearTimeout(t));
+    liveTimers.current = [];
+
+    const pool = people.filter((p) => p.phone);
+    if (pool.length === 0) return;
+
+    // Reset store for dramatic effect.
+    localStorage.removeItem(STORE_KEY);
+    setStore({});
+
+    const totalSteps = pool.length * QUESTIONS.length;
+    setLive({ done: 0, total: totalSteps });
+
+    // Build all (person, question) slots with random delivery times.
+    type Slot = { personId: string; qId: string; choice: "a" | "b"; at: number };
+    const slots: Slot[] = [];
+    const windowMs = 9000;
+    for (const p of pool) {
+      const offset = Math.random() * windowMs * 0.6;
+      for (let i = 0; i < QUESTIONS.length; i++) {
+        const jitter = Math.random() * 700;
+        slots.push({
+          personId: p.id,
+          qId: QUESTIONS[i].id,
+          choice: Math.random() > 0.5 ? "a" : "b",
+          at: offset + i * (windowMs / QUESTIONS.length) * 0.9 + jitter,
+        });
+      }
+    }
+    slots.sort((a, b) => a.at - b.at);
+
+    let done = 0;
+    slots.forEach((slot) => {
+      const t = setTimeout(() => {
+        setStore((prev) => {
+          const next: Store = {
+            ...prev,
+            [slot.personId]: {
+              ...(prev[slot.personId] || {}),
+              [slot.qId]: slot.choice,
+            },
+          };
+          localStorage.setItem(STORE_KEY, JSON.stringify(next));
+          return next;
+        });
+        done += 1;
+        setLive({ done, total: totalSteps });
+        if (done >= totalSteps) {
+          const stop = setTimeout(() => setLive(null), 2200);
+          liveTimers.current.push(stop);
+        }
+      }, slot.at);
+      liveTimers.current.push(t);
+    });
+  }
 
   const stats = useMemo(() => {
     return QUESTIONS.map((q) => {
@@ -64,16 +139,12 @@ export default function Dashboard() {
 
   const mostDivisive = [...stats]
     .filter((s) => s.total > 0)
-    .sort(
-      (x, y) =>
-        Math.abs(50 - x.aPct) - Math.abs(50 - y.aPct)
-    )[0];
+    .sort((x, y) => Math.abs(50 - x.aPct) - Math.abs(50 - y.aPct))[0];
   const mostConsensual = [...stats]
     .filter((s) => s.total > 0)
-    .sort(
-      (x, y) =>
-        Math.abs(50 - y.aPct) - Math.abs(50 - x.aPct)
-    )[0];
+    .sort((x, y) => Math.abs(50 - y.aPct) - Math.abs(50 - x.aPct))[0];
+
+  const maxVotes = Math.max(1, ...stats.map((s) => Math.max(s.a, s.b)));
 
   function seedAll() {
     const next: Store = {};
@@ -93,8 +164,33 @@ export default function Dashboard() {
     setStore({});
   }
 
+  const livePct = live ? Math.round((live.done / Math.max(1, live.total)) * 100) : 0;
+
   return (
     <div className="max-w-[1400px] mx-auto px-6 py-10">
+      {/* Live banner */}
+      {live && (
+        <div className="border-2 border-ink bg-pink text-white p-4 mb-4 flex items-center gap-4">
+          <span className="display text-xs bg-yellow text-ink px-2 py-1 animate-pulse">
+            LIVE
+          </span>
+          <div className="flex-1">
+            <div className="display text-sm">
+              L&apos;IA APPELLE TOUT LE MONDE EN MÊME TEMPS…
+            </div>
+            <div className="border-2 border-cream h-2 mt-2 overflow-hidden bg-ink/40">
+              <div
+                className="bg-yellow h-full transition-all duration-200"
+                style={{ width: `${livePct}%` }}
+              />
+            </div>
+          </div>
+          <div className="display text-sm shrink-0">
+            {live.done}/{live.total}
+          </div>
+        </div>
+      )}
+
       {/* Title band */}
       <section className="border-2 border-ink bg-ink text-cream p-8 mb-6 relative overflow-hidden">
         <span className="display text-sm bg-yellow text-ink px-2 py-1 inline-block mb-3">
@@ -106,8 +202,8 @@ export default function Dashboard() {
           <span className="text-pink">ONT TRANCHÉ</span>
         </h1>
         <p className="mt-4 max-w-xl opacity-80">
-          Les stats consolidées des {people.length} appels de l&apos;IA. Pas de
-          filtre, pas de pitié.
+          Les stats consolidées sur {hydrated ? people.length : "…"} appels de
+          l&apos;IA. Pas de filtre, pas de pitié.
         </p>
       </section>
 
@@ -125,6 +221,55 @@ export default function Dashboard() {
           value={`${hydrated && people.length ? Math.round((totalComplete / people.length) * 100) : 0}%`}
           tone="bg-ink text-yellow"
         />
+      </section>
+
+      {/* Bar chart */}
+      <section className="border-2 border-ink bg-cream p-5 mb-6">
+        <div className="flex items-end justify-between mb-5">
+          <h2 className="display text-3xl">
+            <span className="bg-pink text-white px-2">BARCHART</span>
+          </h2>
+          <div className="flex items-center gap-3 text-xs display">
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 border-2 border-ink bg-yellow inline-block" /> A
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 border-2 border-ink bg-pink inline-block" /> B
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-end gap-2 md:gap-3 h-56 border-b-2 border-ink">
+          {stats.map((s, i) => {
+            const aH = Math.round((s.a / maxVotes) * 100);
+            const bH = Math.round((s.b / maxVotes) * 100);
+            return (
+              <div
+                key={s.q.id}
+                className="flex-1 flex flex-col items-center gap-1 h-full justify-end min-w-0"
+                title={`${s.q.a} vs ${s.q.b} — ${s.a}/${s.b}`}
+              >
+                <div className="flex items-end gap-0.5 md:gap-1 w-full h-full justify-center">
+                  <div
+                    className="bg-yellow border-2 border-ink w-1/2 transition-all duration-500 flex items-start justify-center text-[10px] display pt-1"
+                    style={{ height: `${aH}%` }}
+                  >
+                    {s.a > 0 && aH > 18 ? s.a : ""}
+                  </div>
+                  <div
+                    className="bg-pink border-2 border-ink w-1/2 transition-all duration-500 flex items-start justify-center text-[10px] display pt-1 text-white"
+                    style={{ height: `${bH}%` }}
+                  >
+                    {s.b > 0 && bH > 18 ? s.b : ""}
+                  </div>
+                </div>
+                <div className="display text-[10px] opacity-70">
+                  {String(i + 1).padStart(2, "0")}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       {/* Highlights */}
@@ -204,13 +349,13 @@ export default function Dashboard() {
               <>
                 <div className="flex border-2 border-ink h-12 overflow-hidden">
                   <div
-                    className="bg-yellow text-ink display flex items-center px-3"
+                    className="bg-yellow text-ink display flex items-center px-3 transition-all duration-500"
                     style={{ width: `${s.aPct}%` }}
                   >
                     {s.aPct >= 10 ? `${s.aPct}%` : ""}
                   </div>
                   <div
-                    className="bg-pink text-white display flex items-center justify-end px-3"
+                    className="bg-pink text-white display flex items-center justify-end px-3 transition-all duration-500"
                     style={{ width: `${s.bPct}%` }}
                   >
                     {s.bPct >= 10 ? `${s.bPct}%` : ""}
