@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   DEFAULT_PEOPLE,
@@ -13,6 +13,19 @@ import {
 } from "./lib/data";
 
 const ACCENTS = ["bg-pink text-white", "bg-yellow text-ink", "bg-ink text-yellow"] as const;
+
+const LIVE_CALL_NUMBER = "+33652634191";
+const LIVE_CALL_NAME = "Greg";
+
+type LiveStatus = "idle" | "calling" | "live" | "error";
+type LiveAnswers = Record<number, string>;
+
+function questionsForAgent(): string {
+  return QUESTIONS.map(
+    (q, i) =>
+      `${i + 1}. [${q.label}] Option A: « ${q.a} » — Option B: « ${q.b} »`
+  ).join("\n");
+}
 
 function initials(name: string) {
   return name
@@ -42,11 +55,71 @@ export default function Home() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
+  const [liveStatus, setLiveStatus] = useState<LiveStatus>("idle");
+  const [liveAnswers, setLiveAnswers] = useState<LiveAnswers>({});
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+
   useEffect(() => {
     setStore(loadStore());
     setPeople(loadParticipants());
     setHydrated(true);
+    return () => {
+      eventSourceRef.current?.close();
+    };
   }, []);
+
+  async function startLiveCall() {
+    if (liveStatus === "calling" || liveStatus === "live") return;
+    eventSourceRef.current?.close();
+    setLiveAnswers({});
+    setLiveError(null);
+    setLiveStatus("calling");
+    try {
+      const res = await fetch("/api/call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone_number: LIVE_CALL_NUMBER,
+          contact_name: LIVE_CALL_NAME,
+          questions: questionsForAgent(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLiveStatus("error");
+        setLiveError(data?.error || `Erreur ${res.status}`);
+        return;
+      }
+      const sessionId: string = data.sessionId;
+      const es = new EventSource(`/api/stream?session=${encodeURIComponent(sessionId)}`);
+      eventSourceRef.current = es;
+      es.onmessage = (ev) => {
+        try {
+          const payload = JSON.parse(ev.data);
+          if (payload?.type === "answer" && typeof payload.question_number === "number") {
+            setLiveAnswers((prev) => ({
+              ...prev,
+              [payload.question_number]: String(payload.answer ?? ""),
+            }));
+          }
+        } catch {}
+      };
+      es.onerror = () => {
+        // Keep the UI in "live" until user retries; browser auto-reconnects.
+      };
+      setLiveStatus("live");
+    } catch (err) {
+      setLiveStatus("error");
+      setLiveError(err instanceof Error ? err.message : "Erreur inconnue");
+    }
+  }
+
+  function stopLiveCall() {
+    eventSourceRef.current?.close();
+    eventSourceRef.current = null;
+    setLiveStatus("idle");
+  }
 
   const selected = useMemo(
     () => people.find((p) => p.id === selectedId) ?? null,
@@ -140,6 +213,98 @@ export default function Home() {
               {hydrated ? totalAnswered : 0}
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Live call */}
+      <section className="mb-10">
+        <div className="mb-4 flex items-end justify-between gap-4 flex-wrap">
+          <h2 className="display text-3xl">
+            <span className="bg-pink text-white px-2">EN DIRECT</span>
+          </h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="display text-xs border-2 border-ink px-2 py-1 bg-cream">
+              {LIVE_CALL_NAME} · {LIVE_CALL_NUMBER}
+            </span>
+            <span
+              className={`display text-xs border-2 border-ink px-2 py-1 ${
+                liveStatus === "live"
+                  ? "bg-pink text-white"
+                  : liveStatus === "calling"
+                    ? "bg-yellow text-ink"
+                    : liveStatus === "error"
+                      ? "bg-ink text-cream"
+                      : "bg-cream"
+              }`}
+            >
+              {liveStatus === "idle" && "Prêt"}
+              {liveStatus === "calling" && "Appel en cours…"}
+              {liveStatus === "live" && `En ligne · ${Object.keys(liveAnswers).length}/${QUESTIONS.length}`}
+              {liveStatus === "error" && "Erreur"}
+            </span>
+            {liveStatus !== "live" && liveStatus !== "calling" ? (
+              <button
+                onClick={startLiveCall}
+                className="display text-sm border-2 border-ink px-4 py-3 bg-pink text-white hover:bg-ink"
+              >
+                📞 Appeler {LIVE_CALL_NAME}
+              </button>
+            ) : (
+              <button
+                onClick={stopLiveCall}
+                className="display text-sm border-2 border-ink px-4 py-3 bg-cream hover:bg-yellow"
+              >
+                Arrêter le flux
+              </button>
+            )}
+          </div>
+        </div>
+
+        {liveError && (
+          <div className="border-2 border-ink bg-ink text-cream p-3 mb-4 display text-sm">
+            {liveError}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {QUESTIONS.map((q, i) => {
+            const qn = i + 1;
+            const answer = liveAnswers[qn];
+            const isAnswered = typeof answer === "string" && answer.length > 0;
+            return (
+              <div
+                key={q.id}
+                className={`border-2 border-ink p-4 min-h-[140px] flex flex-col ${
+                  isAnswered ? "bg-cream" : "bg-cream/60"
+                }`}
+              >
+                <div className="flex items-baseline gap-2 mb-2">
+                  <span className="display text-2xl text-pink leading-none">
+                    {String(qn).padStart(2, "0")}
+                  </span>
+                  <div className="display text-[10px] opacity-70 uppercase tracking-wide">
+                    {q.label}
+                  </div>
+                </div>
+                <div className="display text-xs leading-tight mb-2 opacity-80">
+                  {q.a} <span className="text-pink">vs</span> {q.b}
+                </div>
+                <div className="mt-auto">
+                  {isAnswered ? (
+                    <div className="display text-sm bg-ink text-yellow px-2 py-2 leading-snug break-words">
+                      {answer}
+                    </div>
+                  ) : (
+                    <div className="display text-[10px] border-2 border-dashed border-ink/30 px-2 py-2 text-center opacity-60">
+                      {liveStatus === "live" || liveStatus === "calling"
+                        ? "En attente…"
+                        : "—"}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
