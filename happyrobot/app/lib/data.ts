@@ -6,16 +6,16 @@ export type Question = {
 };
 
 export const QUESTIONS: Question[] = [
-  { id: "q1", label: "Rythme de taf", a: "996", b: "10h — pause clope — afterwork" },
-  { id: "q2", label: "Ville", a: "Paris", b: "San Francisco" },
-  { id: "q3", label: "IA préférée", a: "Claude", b: "ChatGPT" },
-  { id: "q4", label: "Camp", a: "Founder", b: "VC" },
-  { id: "q5", label: "Qui pour le faire", a: "IA", b: "Humain" },
+  { id: "q1", label: "Work rhythm", a: "996", b: "10am — smoke break — afterwork" },
+  { id: "q2", label: "City", a: "Paris", b: "San Francisco" },
+  { id: "q3", label: "Favorite AI", a: "Claude", b: "ChatGPT" },
+  { id: "q4", label: "Team", a: "Founder", b: "VC" },
+  { id: "q5", label: "Who ships it", a: "AI", b: "Human" },
   { id: "q6", label: "Cash", a: "Bootstrap (Mickey)", b: "VC money (Evil)" },
-  { id: "q7", label: "Parcours", a: "PhD", b: "YC" },
-  { id: "q8", label: "Incubateur", a: "Station F", b: "YC" },
-  { id: "q9", label: "Un mensonge", a: "Mentir à ton board", b: "Mentir à ta mère" },
-  { id: "q10", label: "Toilettes", a: "YC", b: "WC" },
+  { id: "q7", label: "Path", a: "PhD", b: "YC" },
+  { id: "q8", label: "Incubator", a: "Station F", b: "YC" },
+  { id: "q9", label: "A lie", a: "Lying to your board", b: "Lying to your mom" },
+  { id: "q10", label: "Toilets", a: "YC", b: "WC" },
 ];
 
 export type Person = {

@@ -16,7 +16,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "KONBINI — AI Call Booth",
-  description: "L'IA appelle tes potes, pose des questions bêtes, recrache des stats.",
+  description: "AI calls your crew, asks dumb questions, spits out stats.",
 };
 
 export default function RootLayout({
@@ -26,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="fr"
+      lang="en"
       className={`${anton.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-cream text-ink">
@@ -45,7 +45,7 @@ export default function RootLayout({
                 href="/"
                 className="display text-sm px-3 py-2 border-2 border-ink bg-cream hover:bg-yellow transition-colors"
               >
-                Répondants
+                Respondents
               </Link>
               <Link
                 href="/admin"
@@ -66,9 +66,9 @@ export default function RootLayout({
               {Array.from({ length: 8 }).map((_, i) => (
                 <span key={i} className="px-6">
                   KONBINI CALL BOOTH <span className="text-pink">◆</span>{" "}
-                  L&apos;IA APPELLE, TES POTES RÉPONDENT{" "}
-                  <span className="text-pink">◆</span> 10 QUESTIONS, 2 CHOIX,
-                  AUCUNE PITIÉ <span className="text-pink">◆</span>
+                  AI CALLS, YOUR CREW ANSWERS{" "}
+                  <span className="text-pink">◆</span> 10 QUESTIONS, 2 CHOICES,
+                  NO MERCY <span className="text-pink">◆</span>
                 </span>
               ))}
             </div>

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   ensureSeeded,
   enrichPerson,
@@ -30,13 +29,11 @@ function initials(name: string) {
 }
 
 export default function Admin() {
-  const router = useRouter();
   const [people, setPeople] = useState<Person[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [busy, setBusy] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
-  const [roulette, setRoulette] = useState<{ name: string; picture?: string; locked: boolean } | null>(null);
   const cancelRef = useRef(false);
 
   useEffect(() => {
@@ -78,7 +75,7 @@ export default function Admin() {
   }
 
   async function reloadCsv() {
-    if (!confirm("Recharger le CSV va écraser les enrichissements existants. OK ?"))
+    if (!confirm("Reloading the CSV will overwrite existing enrichments. OK?"))
       return;
     const list = await fetchSeedParticipants();
     persist(list);
@@ -87,7 +84,7 @@ export default function Admin() {
 
   async function enrichOne(person: Person): Promise<LogEntry> {
     if (!person.linkedinUrl) {
-      return { id: person.id, name: person.name, status: "skip", message: "Pas d'URL LinkedIn" };
+      return { id: person.id, name: person.name, status: "skip", message: "No LinkedIn URL" };
     }
     try {
       const res = await fetch("/api/linkedin", {
@@ -126,7 +123,7 @@ export default function Admin() {
         name: person.name,
         url: person.linkedinUrl,
         status: "error",
-        message: e instanceof Error ? e.message : "Erreur réseau",
+        message: e instanceof Error ? e.message : "Network error",
       };
     }
   }
@@ -158,42 +155,12 @@ export default function Admin() {
     cancelRef.current = true;
   }
 
-  async function callRandom() {
-    const pool = people.filter((p) => p.phone);
-    if (pool.length === 0) return;
-    const target = pool[Math.floor(Math.random() * pool.length)];
-    setBusy(true);
-    setLogs([]);
-
-    const steps = 28;
-    for (let i = 0; i < steps; i++) {
-      const pick = pool[Math.floor(Math.random() * pool.length)];
-      setRoulette({ name: pick.name, picture: pick.profilePicture, locked: false });
-      const t = i / steps;
-      const delay = 40 + Math.pow(t, 2.4) * 420;
-      await new Promise((r) => setTimeout(r, delay));
-    }
-    setRoulette({ name: target.name, picture: target.profilePicture, locked: true });
-    await new Promise((r) => setTimeout(r, 700));
-
-    setRoulette(null);
-    setBusy(false);
-    router.push(`/call/${encodeURIComponent(target.id)}`);
-  }
-
-  async function callAll() {
-    const targets = people.filter((p) => p.phone);
-    if (targets.length === 0) return;
-    if (!confirm(`Lancer ${targets.length} appels simultanément ?`)) return;
-    router.push("/dashboard?live=1");
-  }
-
   function removeOne(id: string) {
     persist(people.filter((p) => p.id !== id));
   }
 
   function clearAll() {
-    if (!confirm("Vraiment tout vider ? Tu perdras l'enrichissement Netrows.")) return;
+    if (!confirm("Really wipe everything? You'll lose Netrows enrichment.")) return;
     persist([]);
     setLogs([]);
   }
@@ -207,21 +174,21 @@ export default function Admin() {
           ADMIN
         </span>
         <h1 className="display text-5xl md:text-7xl leading-[0.9]">
-          CASTING &amp; ENRICHISSEMENT
+          CAST &amp; ENRICHMENT
           <br />
           <span className="text-yellow">LINKEDIN × NETROWS</span>
         </h1>
         <p className="mt-4 opacity-80 max-w-xl">
-          La liste vient de <code>participants.csv</code>. Clique sur Enrichir
-          pour remplir photos, postes et villes depuis LinkedIn.
+          The list comes from <code>participants.csv</code>. Click Enrich to
+          pull photos, titles and cities from LinkedIn.
         </p>
       </section>
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <StatCard label="Participants" value={hydrated ? counts.total : "…"} tone="bg-cream text-ink" />
-        <StatCard label="Enrichis" value={hydrated ? counts.enriched : "…"} tone="bg-yellow text-ink" />
-        <StatCard label="À enrichir" value={hydrated ? counts.pending : "…"} tone="bg-pink text-white" />
-        <StatCard label="Avec téléphone" value={hydrated ? counts.withPhone : "…"} tone="bg-ink text-yellow" />
+        <StatCard label="Enriched" value={hydrated ? counts.enriched : "…"} tone="bg-yellow text-ink" />
+        <StatCard label="To enrich" value={hydrated ? counts.pending : "…"} tone="bg-pink text-white" />
+        <StatCard label="With phone" value={hydrated ? counts.withPhone : "…"} tone="bg-ink text-yellow" />
       </section>
 
       <section className="border-2 border-ink bg-cream p-5 mb-6">
@@ -231,42 +198,28 @@ export default function Admin() {
             disabled={busy || counts.pending === 0}
             className="display text-sm border-2 border-ink px-4 py-3 bg-pink text-white hover:bg-ink disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            → Enrichir les {counts.pending || 0} manquants
+            → Enrich {counts.pending || 0} missing
           </button>
           <button
             onClick={() => enrichAll("all")}
             disabled={busy || counts.total === 0}
             className="display text-sm border-2 border-ink px-4 py-3 bg-cream hover:bg-yellow disabled:opacity-40"
           >
-            Re-enrichir tout ({counts.total})
+            Re-enrich all ({counts.total})
           </button>
           <button
             onClick={reloadCsv}
             disabled={busy}
             className="display text-sm border-2 border-ink px-4 py-3 bg-cream hover:bg-yellow disabled:opacity-40"
           >
-            Recharger CSV
-          </button>
-          <button
-            onClick={callRandom}
-            disabled={busy || counts.withPhone === 0}
-            className="display text-sm border-2 border-ink px-4 py-3 bg-yellow text-ink hover:bg-ink hover:text-yellow disabled:opacity-40"
-          >
-            ☎ Call random
-          </button>
-          <button
-            onClick={callAll}
-            disabled={busy || counts.withPhone === 0}
-            className="display text-sm border-2 border-ink px-4 py-3 bg-ink text-yellow hover:bg-pink hover:text-white disabled:opacity-40"
-          >
-            ☎ Call all ({counts.withPhone})
+            Reload CSV
           </button>
           <button
             onClick={clearAll}
             disabled={busy}
             className="display text-sm border-2 border-ink px-4 py-3 bg-cream hover:bg-pink hover:text-white disabled:opacity-40 ml-auto"
           >
-            Vider
+            Wipe
           </button>
           {busy && (
             <button
@@ -281,7 +234,7 @@ export default function Admin() {
         {busy && (
           <div className="mt-4">
             <div className="flex justify-between text-xs display mb-1">
-              <span>Enrichissement en cours…</span>
+              <span>Enrichment in progress…</span>
               <span>
                 {progress.done}/{progress.total} — {pct}%
               </span>
@@ -296,7 +249,7 @@ export default function Admin() {
       {logs.length > 0 && (
         <section className="border-2 border-ink bg-yellow p-5 mb-8">
           <div className="display text-sm mb-3">
-            Journal — {logs.filter((l) => l.status === "ok").length} OK ·{" "}
+            Log — {logs.filter((l) => l.status === "ok").length} OK ·{" "}
             {logs.filter((l) => l.status === "error").length} KO ·{" "}
             {logs.filter((l) => l.status === "skip").length} skip
           </div>
@@ -344,7 +297,7 @@ export default function Admin() {
 
       <section className="mb-4 flex items-end justify-between">
         <h2 className="display text-3xl">
-          <span className="bg-ink text-yellow px-2">CASTING</span>{" "}
+          <span className="bg-ink text-yellow px-2">CAST</span>{" "}
           <span className="text-sm opacity-60">({hydrated ? counts.total : 0})</span>
         </h2>
       </section>
@@ -378,7 +331,7 @@ export default function Admin() {
                 </div>
               ) : (
                 <div className="text-xs italic opacity-60">
-                  {p.enriched ? "—" : "non enrichi"}
+                  {p.enriched ? "—" : "not enriched"}
                 </div>
               )}
               <div className="text-xs opacity-60 truncate">
@@ -404,13 +357,13 @@ export default function Admin() {
                   disabled={busy || !p.linkedinUrl}
                   className="display text-[10px] border-2 border-ink px-2 py-0.5 bg-cream hover:bg-yellow disabled:opacity-40"
                 >
-                  {p.enriched ? "Re-fetch" : "Enrichir"}
+                  {p.enriched ? "Re-fetch" : "Enrich"}
                 </button>
                 <button
                   onClick={() => removeOne(p.id)}
                   className="display text-[10px] border-2 border-ink px-2 py-0.5 bg-cream hover:bg-pink hover:text-white ml-auto"
                 >
-                  Retirer
+                  Remove
                 </button>
               </div>
             </div>
@@ -418,50 +371,12 @@ export default function Admin() {
         ))}
       </section>
 
-      {roulette && (
-        <div className="fixed inset-0 z-50 bg-ink/85 flex items-center justify-center p-6">
-          <div
-            className={`border-4 border-yellow bg-cream text-ink p-10 w-full max-w-2xl text-center transition-transform ${
-              roulette.locked ? "scale-105" : "scale-100"
-            }`}
-          >
-            <div className="display text-sm bg-pink text-white px-2 py-1 inline-block mb-4">
-              {roulette.locked ? "🎯 GAGNÉ" : "🎲 ROULETTE RUSSE"}
-            </div>
-            <div className="flex items-center justify-center gap-5">
-              {roulette.picture ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={roulette.picture}
-                  alt={roulette.name}
-                  className="w-20 h-20 object-cover border-4 border-ink"
-                />
-              ) : (
-                <div className="w-20 h-20 bg-pink text-white display text-3xl flex items-center justify-center border-4 border-ink">
-                  {initials(roulette.name)}
-                </div>
-              )}
-              <div
-                className={`display text-5xl md:text-6xl leading-none ${
-                  roulette.locked ? "text-pink" : "blur-[1px] opacity-80"
-                }`}
-              >
-                {roulette.name}
-              </div>
-            </div>
-            <div className="mt-6 text-xs display opacity-60">
-              {roulette.locked ? "Appel en cours…" : "Tirage en cours…"}
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="mt-8 flex gap-3 justify-center">
         <Link
           href="/"
           className="display text-sm border-2 border-ink px-5 py-3 bg-cream hover:bg-yellow"
         >
-          ← Casting
+          ← Cast
         </Link>
         <Link
           href="/dashboard"

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   QUESTIONS,
   STORE_KEY,
@@ -36,10 +37,15 @@ function saveStore(store: Store) {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [store, setStore] = useState<Store>({});
   const [people, setPeople] = useState<Person[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [roulette, setRoulette] = useState<
+    { name: string; picture?: string; locked: boolean } | null
+  >(null);
 
   useEffect(() => {
     setStore(loadStore());
@@ -58,6 +64,8 @@ export default function Home() {
   const totalAnswered = Object.values(store).filter(
     (a) => Object.keys(a).length === QUESTIONS.length
   ).length;
+
+  const withPhone = people.filter((p) => p.phone).length;
 
   function updateAnswer(personId: string, qId: string, choice: "a" | "b") {
     setStore((prev) => {
@@ -93,10 +101,39 @@ export default function Home() {
 
   function statusOf(id: string) {
     const count = Object.keys(store[id] || {}).length;
-    if (count === 0) return { label: "EN ATTENTE", tone: "bg-cream border-ink text-ink" };
+    if (count === 0) return { label: "PENDING", tone: "bg-cream border-ink text-ink" };
     if (count === QUESTIONS.length)
-      return { label: "TERMINÉ", tone: "bg-ink text-yellow border-ink" };
+      return { label: "DONE", tone: "bg-ink text-yellow border-ink" };
     return { label: `${count}/${QUESTIONS.length}`, tone: "bg-pink text-white border-ink" };
+  }
+
+  async function callRandom() {
+    const pool = people.filter((p) => p.phone);
+    if (pool.length === 0) return;
+    const target = pool[Math.floor(Math.random() * pool.length)];
+    setBusy(true);
+
+    const steps = 28;
+    for (let i = 0; i < steps; i++) {
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      setRoulette({ name: pick.name, picture: pick.profilePicture, locked: false });
+      const t = i / steps;
+      const delay = 40 + Math.pow(t, 2.4) * 420;
+      await new Promise((r) => setTimeout(r, delay));
+    }
+    setRoulette({ name: target.name, picture: target.profilePicture, locked: true });
+    await new Promise((r) => setTimeout(r, 700));
+
+    setRoulette(null);
+    setBusy(false);
+    router.push(`/call/${encodeURIComponent(target.id)}`);
+  }
+
+  async function callAll() {
+    const targets = people.filter((p) => p.phone);
+    if (targets.length === 0) return;
+    if (!confirm(`Start ${targets.length} calls simultaneously?`)) return;
+    router.push("/dashboard?live=1");
   }
 
   return (
@@ -105,22 +142,22 @@ export default function Home() {
       <section className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-10">
         <div className="md:col-span-8 border-2 border-ink bg-cream p-8 relative overflow-hidden">
           <span className="display text-sm bg-pink text-white px-2 py-1 inline-block mb-4">
-            EXCLU
+            EXCLUSIVE
           </span>
           <h1 className="display text-6xl md:text-8xl leading-[0.85] mb-4">
-            L&apos;IA APPELLE
+            AI CALLS
             <br />
             <span className="text-pink">{hydrated ? people.length : "…"}</span>{" "}
             PARTICIPANTS
             <br />
-            ET POSE <span className="bg-yellow px-2">10 QUESTIONS</span>
+            AND ASKS <span className="bg-yellow px-2">10 QUESTIONS</span>
           </h1>
           <p className="max-w-xl text-lg mt-4">
-            Dix dilemmes ultra-clivants, une IA au bout du fil, zéro filtre. File au{" "}
+            Ten sharp dilemmas, an AI on the line, zero filter. Head to the{" "}
             <Link href="/dashboard" className="underline font-semibold text-pink">
               dashboard
             </Link>{" "}
-            pour voir qui s&apos;est grillé.
+            to see who caved.
           </p>
           <div className="absolute right-6 bottom-6 display text-8xl text-pink/20 leading-none select-none">
             {hydrated ? String(totalAnswered).padStart(2, "0") : "00"}
@@ -128,7 +165,7 @@ export default function Home() {
         </div>
         <div className="md:col-span-4 grid grid-rows-3 gap-6">
           <div className="border-2 border-ink bg-pink text-white p-5">
-            <div className="display text-xs opacity-80">RÉPONDANTS</div>
+            <div className="display text-xs opacity-80">RESPONDENTS</div>
             <div className="display text-5xl leading-none mt-1">{people.length}</div>
           </div>
           <div className="border-2 border-ink bg-yellow text-ink p-5">
@@ -136,7 +173,7 @@ export default function Home() {
             <div className="display text-5xl leading-none mt-1">{QUESTIONS.length}</div>
           </div>
           <div className="border-2 border-ink bg-ink text-cream p-5">
-            <div className="display text-xs opacity-60">TERMINÉS</div>
+            <div className="display text-xs opacity-60">COMPLETED</div>
             <div className="display text-5xl leading-none mt-1">
               {hydrated ? totalAnswered : 0}
             </div>
@@ -144,13 +181,34 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Call actions */}
+      <section className="border-2 border-ink bg-cream p-5 mb-6 flex flex-wrap gap-2 items-center">
+        <button
+          onClick={callRandom}
+          disabled={busy || withPhone === 0}
+          className="display text-sm border-2 border-ink px-4 py-3 bg-yellow text-ink hover:bg-ink hover:text-yellow disabled:opacity-40"
+        >
+          ☎ CALL RANDOM
+        </button>
+        <button
+          onClick={callAll}
+          disabled={busy || withPhone === 0}
+          className="display text-sm border-2 border-ink px-4 py-3 bg-ink text-yellow hover:bg-pink hover:text-white disabled:opacity-40"
+        >
+          ☎ CALL ALL ({withPhone})
+        </button>
+        <span className="ml-auto display text-xs opacity-60">
+          Random triggers a live call. Call all launches the live dashboard.
+        </span>
+      </section>
+
       {/* Grid */}
       <section className="mb-4 flex items-end justify-between">
         <h2 className="display text-3xl">
-          <span className="bg-ink text-yellow px-2">LE CASTING</span>
+          <span className="bg-ink text-yellow px-2">THE CAST</span>
         </h2>
         <p className="text-sm opacity-70">
-          Clique pour ouvrir la fiche de questions.
+          Click to open the question sheet.
         </p>
       </section>
 
@@ -201,7 +259,7 @@ export default function Home() {
           <div
             className="flex-1 bg-ink/60"
             onClick={() => setSelectedId(null)}
-            aria-label="Fermer"
+            aria-label="Close"
           />
           <aside className="w-full max-w-xl bg-cream border-l-2 border-ink overflow-y-auto">
             <div className="sticky top-0 z-10 bg-yellow border-b-2 border-ink p-5 flex items-start gap-4">
@@ -218,7 +276,7 @@ export default function Home() {
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <div className="display text-xs text-pink">FICHE D&apos;APPEL</div>
+                <div className="display text-xs text-pink">CALL SHEET</div>
                 <div className="display text-3xl leading-none mt-1 truncate">
                   {selected.name}
                 </div>
@@ -236,7 +294,7 @@ export default function Home() {
               <button
                 onClick={() => setSelectedId(null)}
                 className="display text-lg border-2 border-ink bg-cream w-10 h-10 flex items-center justify-center hover:bg-pink hover:text-white shrink-0"
-                aria-label="Fermer"
+                aria-label="Close"
               >
                 ✕
               </button>
@@ -247,13 +305,13 @@ export default function Home() {
                 onClick={() => randomise(selected.id)}
                 className="display text-xs border-2 border-ink px-3 py-2 bg-cream hover:bg-yellow"
               >
-                🎲 Simuler l&apos;appel
+                🎲 Simulate call
               </button>
               <button
                 onClick={() => reset(selected.id)}
                 className="display text-xs border-2 border-ink px-3 py-2 bg-cream hover:bg-pink hover:text-white"
               >
-                Effacer
+                Clear
               </button>
               <div className="ml-auto display text-xs border-2 border-ink px-3 py-2 bg-ink text-cream">
                 {Object.keys(selectedAnswers).length}/{QUESTIONS.length}
@@ -308,16 +366,55 @@ export default function Home() {
                 href="/dashboard"
                 className="display text-sm border-2 border-ink px-4 py-3 bg-pink text-white hover:bg-ink flex-1 text-center"
               >
-                Voir le dashboard →
+                View dashboard →
               </Link>
               <button
                 onClick={() => setSelectedId(null)}
                 className="display text-sm border-2 border-ink px-4 py-3 bg-cream hover:bg-yellow"
               >
-                Fermer
+                Close
               </button>
             </div>
           </aside>
+        </div>
+      )}
+
+      {/* Roulette overlay */}
+      {roulette && (
+        <div className="fixed inset-0 z-50 bg-ink/85 flex items-center justify-center p-6">
+          <div
+            className={`border-4 border-yellow bg-cream text-ink p-10 w-full max-w-2xl text-center transition-transform ${
+              roulette.locked ? "scale-105" : "scale-100"
+            }`}
+          >
+            <div className="display text-sm bg-pink text-white px-2 py-1 inline-block mb-4">
+              {roulette.locked ? "🎯 WINNER" : "🎲 RUSSIAN ROULETTE"}
+            </div>
+            <div className="flex items-center justify-center gap-5">
+              {roulette.picture ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={roulette.picture}
+                  alt={roulette.name}
+                  className="w-20 h-20 object-cover border-4 border-ink"
+                />
+              ) : (
+                <div className="w-20 h-20 bg-pink text-white display text-3xl flex items-center justify-center border-4 border-ink">
+                  {initials(roulette.name)}
+                </div>
+              )}
+              <div
+                className={`display text-5xl md:text-6xl leading-none ${
+                  roulette.locked ? "text-pink" : "blur-[1px] opacity-80"
+                }`}
+              >
+                {roulette.name}
+              </div>
+            </div>
+            <div className="mt-6 text-xs display opacity-60">
+              {roulette.locked ? "Calling…" : "Spinning…"}
+            </div>
+          </div>
         </div>
       )}
     </div>
