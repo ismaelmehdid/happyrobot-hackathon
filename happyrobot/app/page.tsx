@@ -214,13 +214,18 @@ export default function Home() {
           <span className="display text-sm bg-pink text-white px-2 py-1 inline-block mb-4">
             EXCLUSIVE
           </span>
-          <h1 className="display text-6xl md:text-8xl leading-[0.85] mb-4">
-            AI CALLS
-            <br />
-            <span className="text-pink">{hydrated ? people.length : "…"}</span>{" "}
-            PARTICIPANTS
-            <br />
-            AND ASKS <span className="bg-yellow px-2">10 QUESTIONS</span>
+          <h1 className="display text-5xl md:text-7xl leading-[0.95] mb-4">
+            <span className="block">AI CALLS</span>
+            <span className="block">
+              <span className="text-pink">{hydrated ? people.length : "…"}</span>{" "}
+              PARTICIPANTS
+            </span>
+            <span className="block">
+              AND ASKS{" "}
+              <span className="bg-yellow px-2 box-decoration-clone">
+                10 QUESTIONS
+              </span>
+            </span>
           </h1>
           <p className="max-w-xl text-lg mt-4">
             Ten sharp dilemmas, an AI on the line, zero filter. Head to the{" "}
