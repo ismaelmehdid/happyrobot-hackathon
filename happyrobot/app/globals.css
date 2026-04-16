@@ -1,26 +1,43 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --konbini-pink: #ff0066;
+  --konbini-yellow: #ffe500;
+  --konbini-bg: #f5f0e8;
+  --konbini-ink: #0a0a0a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--konbini-bg);
+  --color-foreground: var(--konbini-ink);
+  --color-pink: var(--konbini-pink);
+  --color-yellow: var(--konbini-yellow);
+  --color-ink: var(--konbini-ink);
+  --color-cream: var(--konbini-bg);
+  --font-display: var(--font-anton);
+  --font-sans: var(--font-inter);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html, body {
+  background: var(--konbini-bg);
+  color: var(--konbini-ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+}
+
+.display {
+  font-family: var(--font-anton), Impact, sans-serif;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.marquee-track {
+  animation: marquee 40s linear infinite;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
