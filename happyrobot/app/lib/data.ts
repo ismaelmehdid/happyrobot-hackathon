@@ -1,3 +1,5 @@
+import { PARTICIPANTS_SEED } from "./participants.seed";
+
 export type Question = {
   id: string;
   label: string;
@@ -81,6 +83,7 @@ export function parseParticipantsCsv(text: string): Person[] {
 }
 
 export async function fetchSeedParticipants(): Promise<Person[]> {
+  if (PARTICIPANTS_SEED.length > 0) return PARTICIPANTS_SEED;
   const res = await fetch(CSV_URL, { cache: "no-store" });
   if (!res.ok) return [];
   const text = await res.text();
@@ -88,8 +91,16 @@ export async function fetchSeedParticipants(): Promise<Person[]> {
 }
 
 export async function ensureSeeded(): Promise<{ list: Person[]; addedIds: string[] }> {
-  const existing = loadParticipants();
   const seeded = await fetchSeedParticipants();
+
+  // When we have a hardcoded enriched seed, it is the source of truth —
+  // localStorage becomes a pure cache and any missing enrichment comes from the seed.
+  if (PARTICIPANTS_SEED.length > 0) {
+    saveParticipants(seeded);
+    return { list: seeded, addedIds: [] };
+  }
+
+  const existing = loadParticipants();
   if (existing.length === 0) {
     if (seeded.length > 0) saveParticipants(seeded);
     return { list: seeded, addedIds: [] };
