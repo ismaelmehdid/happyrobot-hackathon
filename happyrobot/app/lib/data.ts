@@ -23,56 +23,88 @@ export type Person = {
   name: string;
   handle: string;
   city: string;
+  phone?: string;
   headline?: string;
   profilePicture?: string;
   company?: string;
   title?: string;
   linkedinUrl?: string;
+  enriched?: boolean;
 };
-
-const NAMES = [
-  ["Léa", "Martin"], ["Hugo", "Dupont"], ["Chloé", "Bernard"], ["Arthur", "Petit"],
-  ["Inès", "Rousseau"], ["Jules", "Moreau"], ["Camille", "Laurent"], ["Antoine", "Simon"],
-  ["Louise", "Michel"], ["Gabriel", "Lefèvre"], ["Emma", "Leroy"], ["Raphaël", "Roux"],
-  ["Sarah", "David"], ["Nathan", "Blanc"], ["Zoé", "Garnier"], ["Théo", "Faure"],
-  ["Manon", "Durand"], ["Lucas", "Mercier"], ["Romane", "Fontaine"], ["Paul", "Gauthier"],
-  ["Alice", "Boyer"], ["Thomas", "Chevalier"], ["Juliette", "Morel"], ["Maxime", "Dubois"],
-  ["Sophie", "André"], ["Victor", "Lopez"], ["Clara", "Fournier"], ["Baptiste", "Noël"],
-  ["Eva", "Henry"], ["Oscar", "Marchand"],
-];
-
-const CITIES = ["Paris", "San Francisco", "Lyon", "Marseille", "Berlin", "Londres", "New York", "Toulouse"];
-
-const slug = (s: string) =>
-  s.toLowerCase().replace(/[éè]/g, "e").replace(/[ô]/g, "o").replace(/[ï]/g, "i");
-
-export const DEFAULT_PEOPLE: Person[] = NAMES.map(([first, last], i) => ({
-  id: `p${i + 1}`,
-  name: `${first} ${last}`,
-  handle: `@${slug(first)}.${slug(last)}`,
-  city: CITIES[i % CITIES.length],
-}));
 
 export type Answers = Record<string, "a" | "b">;
 export type Store = Record<string, Answers>;
 
 export const STORE_KEY = "konbini.answers.v1";
 export const PARTICIPANTS_KEY = "konbini.participants.v1";
+export const CSV_URL = "/participants.csv";
 
 export function loadParticipants(): Person[] {
-  if (typeof window === "undefined") return DEFAULT_PEOPLE;
+  if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(PARTICIPANTS_KEY);
-    if (!raw) return DEFAULT_PEOPLE;
-    const parsed = JSON.parse(raw) as Person[];
-    return parsed.length > 0 ? parsed : DEFAULT_PEOPLE;
+    if (!raw) return [];
+    return JSON.parse(raw) as Person[];
   } catch {
-    return DEFAULT_PEOPLE;
+    return [];
   }
 }
 
 export function saveParticipants(people: Person[]) {
   localStorage.setItem(PARTICIPANTS_KEY, JSON.stringify(people));
+}
+
+function extractSlug(url: string): string {
+  const m = url.match(/linkedin\.com\/in\/([^/?#]+)/i);
+  return m ? decodeURIComponent(m[1]) : url;
+}
+
+export function parseParticipantsCsv(text: string): Person[] {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length === 0) return [];
+  const [, ...rows] = lines;
+  return rows.map((line) => {
+    const cells = line.split(",");
+    const name = (cells[0] || "").trim();
+    const phone = (cells[1] || "").trim();
+    const linkedinUrl = (cells[2] || "").trim();
+    const slug = extractSlug(linkedinUrl);
+    return {
+      id: `li_${slug}`,
+      name,
+      handle: `@${slug}`,
+      city: "",
+      phone: phone || undefined,
+      linkedinUrl: linkedinUrl || undefined,
+    } satisfies Person;
+  });
+}
+
+export async function fetchSeedParticipants(): Promise<Person[]> {
+  const res = await fetch(CSV_URL, { cache: "no-store" });
+  if (!res.ok) return [];
+  const text = await res.text();
+  return parseParticipantsCsv(text);
+}
+
+export async function ensureSeeded(): Promise<{ list: Person[]; addedIds: string[] }> {
+  const existing = loadParticipants();
+  const seeded = await fetchSeedParticipants();
+  if (existing.length === 0) {
+    if (seeded.length > 0) saveParticipants(seeded);
+    return { list: seeded, addedIds: [] };
+  }
+  const byId = new Map(existing.map((p) => [p.id, p] as const));
+  const addedIds: string[] = [];
+  for (const p of seeded) {
+    if (!byId.has(p.id)) {
+      byId.set(p.id, p);
+      addedIds.push(p.id);
+    }
+  }
+  const merged = Array.from(byId.values());
+  if (addedIds.length > 0) saveParticipants(merged);
+  return { list: merged, addedIds };
 }
 
 type NetrowsProfile = {
@@ -87,24 +119,19 @@ type NetrowsProfile = {
   position?: Array<{ title?: string; companyName?: string }>;
 };
 
-export function profileToPerson(
-  profile: NetrowsProfile,
-  linkedinUrl?: string
-): Person {
+export function enrichPerson(base: Person, profile: NetrowsProfile): Person {
   const first = profile.firstName?.trim() || "";
   const last = profile.lastName?.trim() || "";
-  const name = `${first} ${last}`.trim() || profile.username || "Inconnu";
-  const username = profile.username || String(profile.id || profile.urn || name);
+  const apiName = `${first} ${last}`.trim();
   const position = profile.position?.[0];
   return {
-    id: `li_${username}`,
-    name,
-    handle: `@${username}`,
-    city: profile.geo?.city || profile.geo?.country || "",
-    headline: profile.headline,
-    profilePicture: profile.profilePicture,
-    company: position?.companyName,
-    title: position?.title,
-    linkedinUrl,
+    ...base,
+    name: apiName || base.name,
+    city: profile.geo?.city || profile.geo?.country || base.city,
+    headline: profile.headline || base.headline,
+    profilePicture: profile.profilePicture || base.profilePicture,
+    company: position?.companyName || base.company,
+    title: position?.title || base.title,
+    enriched: true,
   };
 }

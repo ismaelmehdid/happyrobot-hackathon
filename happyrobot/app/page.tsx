@@ -3,10 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  DEFAULT_PEOPLE,
   QUESTIONS,
   STORE_KEY,
-  loadParticipants,
+  ensureSeeded,
   type Answers,
   type Person,
   type Store,
@@ -38,14 +37,16 @@ function saveStore(store: Store) {
 
 export default function Home() {
   const [store, setStore] = useState<Store>({});
-  const [people, setPeople] = useState<Person[]>(DEFAULT_PEOPLE);
+  const [people, setPeople] = useState<Person[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     setStore(loadStore());
-    setPeople(loadParticipants());
-    setHydrated(true);
+    ensureSeeded().then(({ list }) => {
+      setPeople(list);
+      setHydrated(true);
+    });
   }, []);
 
   const selected = useMemo(
@@ -109,17 +110,17 @@ export default function Home() {
           <h1 className="display text-6xl md:text-8xl leading-[0.85] mb-4">
             L&apos;IA APPELLE
             <br />
-            <span className="text-pink">30 FRENCHIES</span>
+            <span className="text-pink">{hydrated ? people.length : "…"}</span>{" "}
+            PARTICIPANTS
             <br />
             ET POSE <span className="bg-yellow px-2">10 QUESTIONS</span>
           </h1>
           <p className="max-w-xl text-lg mt-4">
-            Clique sur une tête, réponds à sa place (parce qu&apos;on est pressé),
-            ensuite file au{" "}
+            Dix dilemmes ultra-clivants, une IA au bout du fil, zéro filtre. File au{" "}
             <Link href="/dashboard" className="underline font-semibold text-pink">
               dashboard
             </Link>{" "}
-            pour voir qui a tort.
+            pour voir qui s&apos;est grillé.
           </p>
           <div className="absolute right-6 bottom-6 display text-8xl text-pink/20 leading-none select-none">
             {hydrated ? String(totalAnswered).padStart(2, "0") : "00"}
