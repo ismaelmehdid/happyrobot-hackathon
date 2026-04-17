@@ -8,8 +8,11 @@ import {
   ensureSeeded,
   loadParticipants,
   type Person,
+  type Question,
   type Store,
 } from "../lib/data";
+
+const LIVE_SESSIONS_KEY = "konbini.liveSessions.v1";
 
 function loadStore(): Store {
   if (typeof window === "undefined") return {};
@@ -20,12 +23,27 @@ function loadStore(): Store {
   }
 }
 
+function toChoice(raw: string, q: Question): "a" | "b" | null {
+  const s = raw.trim().toLowerCase();
+  if (!s || s === "skipped") return null;
+  if (s === "a" || s === "option a") return "a";
+  if (s === "b" || s === "option b") return "b";
+  const aL = q.a.toLowerCase();
+  const bL = q.b.toLowerCase();
+  if (s === aL) return "a";
+  if (s === bL) return "b";
+  if (aL.includes(s) || s.includes(aL)) return "a";
+  if (bL.includes(s) || s.includes(bL)) return "b";
+  return null;
+}
+
 export default function Dashboard() {
   const [store, setStore] = useState<Store>({});
   const [people, setPeople] = useState<Person[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [live, setLive] = useState<{ done: number; total: number } | null>(null);
   const liveTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const liveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     setStore(loadStore());
@@ -42,6 +60,10 @@ export default function Dashboard() {
       window.removeEventListener("storage", onStorage);
       liveTimers.current.forEach((t) => clearTimeout(t));
       liveTimers.current = [];
+      if (liveIntervalRef.current) {
+        clearInterval(liveIntervalRef.current);
+        liveIntervalRef.current = null;
+      }
     };
   }, []);
 
@@ -49,11 +71,90 @@ export default function Dashboard() {
     if (!hydrated) return;
     const isLive = new URLSearchParams(window.location.search).get("live") === "1";
     if (!isLive) return;
-    startLiveSimulation();
-    // Clean the query so reload doesn't restart the sim.
+
+    let sessionMap: Record<string, string> = {};
+    try {
+      const raw = sessionStorage.getItem(LIVE_SESSIONS_KEY);
+      if (raw) sessionMap = JSON.parse(raw);
+    } catch {}
+    sessionStorage.removeItem(LIVE_SESSIONS_KEY);
+
+    if (Object.keys(sessionMap).length > 0) {
+      startRealLive(sessionMap);
+    } else {
+      startLiveSimulation();
+    }
     window.history.replaceState(null, "", "/dashboard");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated]);
+
+  function startRealLive(sessionMap: Record<string, string>) {
+    liveTimers.current.forEach((t) => clearTimeout(t));
+    liveTimers.current = [];
+    if (liveIntervalRef.current) {
+      clearInterval(liveIntervalRef.current);
+      liveIntervalRef.current = null;
+    }
+
+    localStorage.removeItem(STORE_KEY);
+    setStore({});
+
+    const entries = Object.entries(sessionMap);
+    const totalSteps = entries.length * QUESTIONS.length;
+    setLive({ done: 0, total: totalSteps });
+
+    const processed = new Set<string>();
+
+    const tick = async () => {
+      const results = await Promise.allSettled(
+        entries.map(async ([personId, sessionId]) => {
+          const r = await fetch(
+            `/api/answers?session=${encodeURIComponent(sessionId)}`,
+            { cache: "no-store" }
+          );
+          if (!r.ok) return null;
+          const data = (await r.json()) as {
+            answers: { question_number: number; answer: string }[];
+          };
+          return { personId, answers: data.answers ?? [] };
+        })
+      );
+
+      setStore((prev) => {
+        const next: Store = { ...prev };
+        let changed = false;
+        for (const r of results) {
+          if (r.status !== "fulfilled" || !r.value) continue;
+          const { personId, answers } = r.value;
+          for (const a of answers) {
+            const key = `${personId}:${a.question_number}`;
+            if (processed.has(key)) continue;
+            processed.add(key);
+            const q = QUESTIONS[a.question_number - 1];
+            if (!q) continue;
+            const choice = toChoice(String(a.answer ?? ""), q);
+            if (!choice) continue;
+            next[personId] = { ...(next[personId] || {}), [q.id]: choice };
+            changed = true;
+          }
+        }
+        if (changed) localStorage.setItem(STORE_KEY, JSON.stringify(next));
+        return changed ? next : prev;
+      });
+
+      setLive({ done: processed.size, total: totalSteps });
+
+      if (processed.size >= totalSteps && liveIntervalRef.current) {
+        clearInterval(liveIntervalRef.current);
+        liveIntervalRef.current = null;
+        const stop = setTimeout(() => setLive(null), 2200);
+        liveTimers.current.push(stop);
+      }
+    };
+
+    tick();
+    liveIntervalRef.current = setInterval(tick, 1500);
+  }
 
   function startLiveSimulation() {
     liveTimers.current.forEach((t) => clearTimeout(t));

@@ -10,6 +10,7 @@ export async function GET(req: Request) {
     return new Response("session requis", { status: 400 });
   }
 
+  console.log(`[stream] subscribing session=${sessionId}`);
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -50,6 +51,7 @@ export async function GET(req: Request) {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
     },
   });
 }

@@ -36,6 +36,9 @@ export async function POST(req: Request) {
     );
   }
 
+  console.log(
+    `[hr-webhook] session=${sessionId} q=${qn} answer=${answer.slice(0, 80)}`
+  );
   recordAnswer(sessionId, {
     question_number: qn,
     answer,

@@ -14,10 +14,10 @@ export const QUESTIONS: Question[] = [
   { id: "q4", label: "Team", a: "Founder", b: "VC" },
   { id: "q5", label: "Who ships it", a: "AI", b: "Human" },
   { id: "q6", label: "Cash", a: "Bootstrap (Mickey)", b: "VC money (Evil)" },
-  { id: "q7", label: "Path", a: "PhD", b: "YC" },
-  { id: "q8", label: "Incubator", a: "Station F", b: "YC" },
-  { id: "q9", label: "A lie", a: "Lying to your board", b: "Lying to your mom" },
-  { id: "q10", label: "Toilets", a: "YC", b: "WC" },
+  { id: "q7", label: "Incubator", a: "Station F", b: "YC" },
+  { id: "q8", label: "A lie", a: "Lying to your board", b: "Lying to your mom" },
+  { id: "q9", label: "Toilets", a: "YC", b: "WC" },
+  { id: "q10", label: "Robot", a: "HappyRobot", b: "SadRobot" },
 ];
 
 export type Person = {

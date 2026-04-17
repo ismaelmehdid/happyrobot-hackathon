@@ -16,6 +16,7 @@ const ACCENTS = ["bg-pink text-white", "bg-yellow text-ink", "bg-ink text-yellow
 
 const LIVE_CALL_NUMBER = "+33652634191";
 const LIVE_CALL_NAME = "Greg";
+const LIVE_SESSIONS_KEY = "konbini.liveSessions.v1";
 
 type LiveStatus = "idle" | "calling" | "live" | "error";
 type LiveAnswers = Record<number, string>;
@@ -64,6 +65,7 @@ export default function Home() {
   const [liveAnswers, setLiveAnswers] = useState<LiveAnswers>({});
   const [liveError, setLiveError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     setStore(loadStore());
@@ -71,9 +73,13 @@ export default function Home() {
       setPeople(list);
       setHydrated(true);
     });
+    return () => {
+      eventSourceRef.current?.close();
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, []);
 
-  async function startLiveCall() {
+  async function startLiveCall(contactName: string = LIVE_CALL_NAME) {
     if (liveStatus === "calling" || liveStatus === "live") return;
     eventSourceRef.current?.close();
     setLiveAnswers({});
@@ -85,7 +91,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phone_number: LIVE_CALL_NUMBER,
-          contact_name: LIVE_CALL_NAME,
+          contact_name: contactName,
           questions: questionsForAgent(),
         }),
       });
@@ -112,6 +118,23 @@ export default function Home() {
       es.onerror = () => {
         // Keep the UI in "live" until user retries; browser auto-reconnects.
       };
+      // Polling fallback: some proxies (ngrok free tier) buffer SSE.
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(async () => {
+        try {
+          const r = await fetch(`/api/answers?session=${encodeURIComponent(sessionId)}`, { cache: "no-store" });
+          if (!r.ok) return;
+          const { answers } = (await r.json()) as {
+            answers: { question_number: number; answer: string }[];
+          };
+          if (!Array.isArray(answers)) return;
+          setLiveAnswers((prev) => {
+            const next = { ...prev };
+            for (const a of answers) next[a.question_number] = String(a.answer ?? "");
+            return next;
+          });
+        } catch {}
+      }, 1500);
       setLiveStatus("live");
     } catch (err) {
       setLiveStatus("error");
@@ -122,6 +145,10 @@ export default function Home() {
   function stopLiveCall() {
     eventSourceRef.current?.close();
     eventSourceRef.current = null;
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
     setLiveStatus("idle");
   }
 
@@ -197,13 +224,79 @@ export default function Home() {
 
     setRoulette(null);
     setBusy(false);
-    router.push(`/call/${encodeURIComponent(target.id)}`);
+    try {
+      const res = await fetch("/api/call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone_number: target.phone,
+          contact_name: target.name,
+          questions: questionsForAgent(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data?.error || `Error ${res.status}`);
+        return;
+      }
+      router.push(
+        `/call/${encodeURIComponent(target.id)}?session=${encodeURIComponent(data.sessionId)}`
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Unknown error");
+    }
   }
 
   async function callAll() {
     const targets = people.filter((p) => p.phone);
     if (targets.length === 0) return;
     if (!confirm(`Start ${targets.length} calls simultaneously?`)) return;
+    setBusy(true);
+
+    const questions = questionsForAgent();
+    const results = await Promise.allSettled(
+      targets.map((p) =>
+        fetch("/api/call", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phone_number: p.phone,
+            contact_name: p.name,
+            questions,
+          }),
+        }).then(async (res) => {
+          const data = await res.json();
+          if (!res.ok) throw new Error(data?.error || `Error ${res.status}`);
+          return { personId: p.id, sessionId: data.sessionId as string };
+        })
+      )
+    );
+
+    const sessionMap: Record<string, string> = {};
+    const errors: string[] = [];
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled") {
+        sessionMap[r.value.personId] = r.value.sessionId;
+      } else {
+        const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
+        errors.push(`${targets[i].name}: ${msg}`);
+      }
+    });
+
+    setBusy(false);
+
+    if (errors.length > 0) {
+      const sample = errors.slice(0, 3).join("\n");
+      alert(
+        `${errors.length}/${targets.length} call(s) failed:\n${sample}${
+          errors.length > 3 ? "\n…" : ""
+        }`
+      );
+    }
+
+    if (Object.keys(sessionMap).length === 0) return;
+
+    sessionStorage.setItem(LIVE_SESSIONS_KEY, JSON.stringify(sessionMap));
     router.push("/dashboard?live=1");
   }
 
@@ -306,7 +399,7 @@ export default function Home() {
             </span>
             {liveStatus !== "live" && liveStatus !== "calling" ? (
               <button
-                onClick={startLiveCall}
+                onClick={() => startLiveCall()}
                 className="display text-sm border-2 border-ink px-4 py-3 bg-pink text-white hover:bg-ink"
               >
                 📞 Call {LIVE_CALL_NAME}

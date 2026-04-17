@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   QUESTIONS,
@@ -9,6 +9,7 @@ import {
   ensureSeeded,
   type Answers,
   type Person,
+  type Question,
   type Store,
 } from "../../lib/data";
 
@@ -37,17 +38,38 @@ function initials(name: string) {
     .toUpperCase();
 }
 
+function toChoice(raw: string, q: Question): "a" | "b" | null {
+  const s = raw.trim().toLowerCase();
+  if (!s || s === "skipped") return null;
+  if (s === "a" || s === "option a") return "a";
+  if (s === "b" || s === "option b") return "b";
+  const aL = q.a.toLowerCase();
+  const bL = q.b.toLowerCase();
+  if (s === aL) return "a";
+  if (s === bL) return "b";
+  if (aL.includes(s) || s.includes(aL)) return "a";
+  if (bL.includes(s) || s.includes(bL)) return "b";
+  return null;
+}
+
 export default function CallPage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const id = decodeURIComponent(params?.id || "");
+  const sessionId = searchParams?.get("session") ?? null;
 
   const [people, setPeople] = useState<Person[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [qIndex, setQIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>("dialing");
   const [answers, setAnswers] = useState<Answers>({});
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [rawAnswers, setRawAnswers] = useState<Record<number, string>>({});
+  const esRef = useRef<EventSource | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dialTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const processedRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     ensureSeeded().then(({ list }) => {
@@ -63,59 +85,108 @@ export default function CallPage() {
 
   useEffect(() => {
     return () => {
-      timers.current.forEach((t) => clearTimeout(t));
-      timers.current = [];
+      esRef.current?.close();
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+      if (dialTimerRef.current) clearTimeout(dialTimerRef.current);
     };
   }, []);
 
   useEffect(() => {
     if (!person) return;
 
-    timers.current.forEach((t) => clearTimeout(t));
-    timers.current = [];
+    esRef.current?.close();
+    if (pollRef.current) clearInterval(pollRef.current);
+    if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    if (dialTimerRef.current) clearTimeout(dialTimerRef.current);
+    processedRef.current = new Set();
 
     setPhase("dialing");
     setQIndex(0);
     setAnswers({});
+    setRawAnswers({});
 
     const prevStore = loadStore();
     const nextStore = { ...prevStore };
     delete nextStore[person.id];
     saveStore(nextStore);
 
-    const schedule = (fn: () => void, ms: number) => {
-      const t = setTimeout(fn, ms);
-      timers.current.push(t);
-    };
+    // Assume the agent finishes dialing + greeting in ~4s, then starts asking Q1.
+    dialTimerRef.current = setTimeout(() => {
+      setPhase((p) => (p === "dialing" ? "asking" : p));
+    }, 4000);
 
-    const runQuestion = (i: number, accumulated: Answers) => {
-      if (i >= QUESTIONS.length) {
-        setPhase("done");
-        return;
-      }
-      setQIndex(i);
-      setPhase("asking");
+    if (!sessionId) return;
 
-      schedule(() => {
-        const choice: "a" | "b" = Math.random() > 0.5 ? "a" : "b";
-        const nextAnswers = { ...accumulated, [QUESTIONS[i].id]: choice };
-        setAnswers(nextAnswers);
-        setPhase("answered");
+    const applyEvent = (qn: number, raw: string) => {
+      if (processedRef.current.has(qn)) return;
+      processedRef.current.add(qn);
 
+      const q = QUESTIONS[qn - 1];
+      if (!q) return;
+
+      setRawAnswers((prev) => ({ ...prev, [qn]: raw }));
+      const choice = toChoice(raw, q);
+
+      setAnswers((prev) => {
+        const next: Answers = { ...prev };
+        if (choice) next[q.id] = choice;
         const store = loadStore();
-        store[person.id] = nextAnswers;
+        store[person.id] = next;
         saveStore(store);
+        return next;
+      });
 
-        schedule(() => {
-          runQuestion(i + 1, nextAnswers);
+      // Flash "answered" for the question that just came in, pinned to its index.
+      setQIndex(qn - 1);
+      setPhase("answered");
+
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+      if (qn >= QUESTIONS.length) {
+        advanceTimerRef.current = setTimeout(() => setPhase("done"), 900);
+      } else {
+        // After the flash, jump to "asking" the NEXT question.
+        advanceTimerRef.current = setTimeout(() => {
+          setQIndex(qn);
+          setPhase("asking");
         }, 900);
-      }, 1400 + Math.random() * 700);
+      }
     };
 
-    schedule(() => {
-      runQuestion(0, {});
-    }, 1400);
-  }, [person?.id]);
+    const es = new EventSource(
+      `/api/stream?session=${encodeURIComponent(sessionId)}`
+    );
+    esRef.current = es;
+    es.onmessage = (ev) => {
+      try {
+        const payload = JSON.parse(ev.data);
+        if (payload?.type === "answer" && typeof payload.question_number === "number") {
+          applyEvent(payload.question_number, String(payload.answer ?? ""));
+        }
+      } catch {}
+    };
+
+    pollRef.current = setInterval(async () => {
+      try {
+        const r = await fetch(
+          `/api/answers?session=${encodeURIComponent(sessionId)}`,
+          { cache: "no-store" }
+        );
+        if (!r.ok) return;
+        const { answers: evs } = (await r.json()) as {
+          answers: { question_number: number; answer: string }[];
+        };
+        for (const a of evs) applyEvent(a.question_number, String(a.answer ?? ""));
+      } catch {}
+    }, 1500);
+
+    return () => {
+      es.close();
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+      if (dialTimerRef.current) clearTimeout(dialTimerRef.current);
+    };
+  }, [person?.id, sessionId]);
 
   if (hydrated && !person) {
     return (
