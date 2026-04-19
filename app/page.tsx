@@ -15,7 +15,13 @@ const ACCENTS = [
 ] as const;
 
 type LiveStatus = "idle" | "calling" | "live" | "error";
-type Me = { id: string; phone: string; name: string };
+type Me = {
+  id: string;
+  phone: string;
+  name: string;
+  realName?: string;
+  profilePicture?: string;
+};
 
 type AnswerRow = {
   user_id: string;
@@ -28,6 +34,19 @@ function questionsForAgent(): string {
     (q) =>
       `[${q.id}] ${q.label}: Option A « ${q.a} » — Option B « ${q.b} »`,
   ).join("\n");
+}
+
+function LinkedInIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.602 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.063 2.063 0 1 1 2.063 2.065zm1.777 13.019H3.558V9h3.556v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+    </svg>
+  );
 }
 
 function initials(name: string) {
@@ -74,10 +93,24 @@ export default function Home() {
       if (session) {
         const u = session.user;
         const phone = normalizePhone(u.phone ?? "");
-        const metaName =
-          (u.user_metadata?.full_name as string | undefined) ?? undefined;
-        const name = metaName || u.email || phone || "You";
-        if (phone) setMe({ id: u.id, phone, name });
+        const meta = u.user_metadata as
+          | {
+              display_name?: string;
+              full_name?: string;
+              profile_picture_url?: string;
+            }
+          | null;
+        const metaName = meta?.display_name || meta?.full_name;
+        const realName = metaName || u.email || undefined;
+        const name = realName || phone || "You";
+        if (phone)
+          setMe({
+            id: u.id,
+            phone,
+            name,
+            realName,
+            profilePicture: meta?.profile_picture_url,
+          });
         supabase.realtime.setAuth(session.access_token);
       }
 
@@ -130,7 +163,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phone_number: me.phone,
-          contact_name: me.name,
+          ...(me.realName ? { contact_name: me.realName } : {}),
           questions: questionsForAgent(),
         }),
       });
@@ -142,6 +175,11 @@ export default function Home() {
             ? data.error
             : "Couldn't start the call. Please try again.",
         );
+        return;
+      }
+      if (data?.allAnswered) {
+        setLiveStatus("idle");
+        setLiveError("You've already answered every question. Thanks!");
         return;
       }
       setLiveStatus("live");
@@ -434,11 +472,27 @@ export default function Home() {
                   initials(p.name)
                 )}
               </div>
-              <div className="display text-base leading-tight truncate">
-                {p.name}
-              </div>
-              <div className="text-xs opacity-60 truncate">
-                {p.title ? p.title : p.city}
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="display text-base leading-tight truncate">
+                    {p.name}
+                  </div>
+                  <div className="text-xs opacity-60 truncate">
+                    {p.title ? p.title : p.city}
+                  </div>
+                </div>
+                {p.linkedinUrl && (
+                  <a
+                    href={p.linkedinUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${p.name} on LinkedIn`}
+                    title={`${p.name} on LinkedIn`}
+                    className="shrink-0 border-2 border-ink bg-[#0A66C2] text-white p-1 hover:bg-ink transition-colors"
+                  >
+                    <LinkedInIcon className="w-4 h-4" />
+                  </a>
+                )}
               </div>
             </div>
           );

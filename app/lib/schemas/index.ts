@@ -6,3 +6,4 @@ export * from "./call";
 export * from "./webhook";
 export * from "./participant";
 export * from "./http";
+export * from "./profile";

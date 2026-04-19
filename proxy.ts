@@ -4,7 +4,11 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PREFIXES = ["/sign-in", "/api/hr-webhook", "/auth"];
 
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // Expose the pathname to server components via a request header so the root
+  // layout can toggle chrome (header/footer/marquee) on auth-style pages.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
+  let response = NextResponse.next({ request: { headers: requestHeaders } });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,7 +22,7 @@ export async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
-          response = NextResponse.next({ request });
+          response = NextResponse.next({ request: { headers: requestHeaders } });
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options),
           );
@@ -46,6 +50,27 @@ export async function proxy(request: NextRequest) {
     url.pathname = "/";
     url.search = "";
     return NextResponse.redirect(url);
+  }
+
+  // First-login gate: every authenticated user must have a first_name in
+  // metadata. Missing → push them to /onboarding. The fields are written once
+  // by the saveProfile action, so subsequent logins skip this redirect.
+  if (user) {
+    const hasProfile = Boolean(
+      (user.user_metadata as { first_name?: string } | null)?.first_name,
+    );
+    if (!hasProfile && !pathname.startsWith("/onboarding")) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/onboarding";
+      if (pathname !== "/") url.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(url);
+    }
+    if (hasProfile && pathname.startsWith("/onboarding")) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

@@ -7,12 +7,6 @@ export const environmentSchema = z
 
 export const callRequestSchema = z.object({
   phone_number: phoneSchema,
-  contact_name: z
-    .string()
-    .trim()
-    .min(1, "contact_name is required.")
-    .max(100, "contact_name is too long (max 100).")
-    .default("l'invité"),
   questions: z
     .string()
     .trim()

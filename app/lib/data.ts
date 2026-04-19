@@ -22,15 +22,15 @@ export const QUESTIONS: Question[] = [
   { id: "q10", label: "Robot", a: "HappyRobot", b: "SadRobot" },
 ];
 
-export const PARTICIPANTS_URL = "/participants.json";
+export const ROSTER_URL = "/api/roster";
 
 export async function fetchSeedParticipants(): Promise<Person[]> {
-  const res = await fetch(PARTICIPANTS_URL, { cache: "no-store" });
+  const res = await fetch(ROSTER_URL, { cache: "no-store" });
   if (!res.ok) return [];
   const raw = await res.json();
   const parsed = personArraySchema.safeParse(raw);
   if (!parsed.success) {
-    console.error("participants.json failed schema validation", parsed.error.issues);
+    console.error("roster failed schema validation", parsed.error.issues);
     return [];
   }
   return parsed.data;

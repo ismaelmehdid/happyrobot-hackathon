@@ -6,6 +6,13 @@ import { createAdminClient } from "@/app/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
+// Prepended to every HappyRobot payload. The agent must not accept a skip,
+// "pass", silence, or any non-A/non-B response — it has to re-ask until the
+// caller picks one of the two options. Without this the webhook silently
+// drops skipped answers and the user ends up with holes in their sheet.
+const NO_SKIP_INSTRUCTION =
+  "STRICT RULE: every question below must be answered with either option A or option B. Do not accept skipping, 'pass', 'I don't know', 'neither', silence, or any other response — politely re-ask the same question until you have a clear A or B. Do not advance to the next question without a valid A/B answer for the current one, and do not end the call until every question has an A or B answer.";
+
 const WORKFLOW_SLUG = process.env.HAPPYROBOT_WORKFLOW_SLUG ?? "2wp08hzdnbu6";
 const HR_BASE_URL =
   process.env.HAPPYROBOT_BASE_URL ?? "https://platform.happyrobot.ai";
@@ -42,13 +49,64 @@ export async function POST(req: Request) {
 
   const parsed = await parseJsonBody(req, callRequestSchema);
   if (!parsed.ok) return parsed.response;
-  const { phone_number, contact_name, questions, environment } = parsed.data;
+  const { phone_number, questions, environment } = parsed.data;
+
+  // Prevent toll fraud: a caller can only trigger a call to their own verified
+  // phone. Supabase may store `user.phone` as digits without the leading '+',
+  // so compare on digits only.
+  const digits = (s: string) => s.replace(/\D/g, "");
+  if (!user.phone || digits(phone_number) !== digits(user.phone)) {
+    return NextResponse.json(
+      { error: "You can only call your own verified phone number." },
+      { status: 403 },
+    );
+  }
+
+  // The AI addresses the caller by name. We pull it from the verified
+  // user_metadata (written by the onboarding action) rather than trusting the
+  // client — same reason we verify phone server-side.
+  const meta = user.user_metadata as
+    | { first_name?: string; last_name?: string; display_name?: string }
+    | null;
+  const contact_name =
+    meta?.display_name ||
+    [meta?.first_name, meta?.last_name].filter(Boolean).join(" ") ||
+    "l'invité";
+
+  const admin = createAdminClient();
+
+  // Resume-aware: skip questions this user has already answered so a re-call
+  // picks up from the next unanswered one.
+  const { data: answered, error: answeredError } = await admin
+    .from("answers")
+    .select("question_id")
+    .eq("user_id", user.id);
+  if (answeredError) {
+    console.error("[call] failed to read existing answers", answeredError);
+    return NextResponse.json(
+      { error: "Failed to load prior answers." },
+      { status: 500 },
+    );
+  }
+  const answeredIds = new Set((answered ?? []).map((r) => r.question_id));
+
+  const remainingQuestions = questions
+    .split("\n")
+    .filter((line) => {
+      const m = line.match(/^\s*\[(q\d+)\]/);
+      return !m || !answeredIds.has(m[1]);
+    })
+    .join("\n")
+    .trim();
+
+  if (!remainingQuestions) {
+    return NextResponse.json({ allAnswered: true });
+  }
 
   const sessionId = randomUUID();
 
   // Persist the session first so the webhook can map session → user_id when
   // answers start arriving. Service role bypasses RLS.
-  const admin = createAdminClient();
   const { error: sessionError } = await admin.from("call_sessions").insert({
     id: sessionId,
     user_id: user.id,
@@ -74,7 +132,12 @@ export async function POST(req: Request) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      payload: { phone_number, contact_name, questions, webhook_url },
+      payload: {
+        phone_number,
+        contact_name,
+        questions: `${NO_SKIP_INSTRUCTION}\n\n${remainingQuestions}`,
+        webhook_url,
+      },
     }),
     cache: "no-store",
   });
