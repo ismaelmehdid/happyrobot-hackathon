@@ -132,8 +132,7 @@ export default function Home() {
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "answers" },
-          async (payload) => {
-            console.log("[realtime] answers event", payload);
+          async () => {
             const { data } = await supabase
               .from("answers")
               .select("user_id, question_id, choice");
@@ -141,9 +140,7 @@ export default function Home() {
             setAnswers((data as AnswerRow[]) ?? []);
           },
         )
-        .subscribe((status) => {
-          console.log("[realtime] answers channel →", status);
-        });
+        .subscribe();
     })();
 
     return () => {
