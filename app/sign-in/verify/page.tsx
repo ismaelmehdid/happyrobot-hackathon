@@ -10,6 +10,7 @@ import {
   verifyOtpFormSchema,
   type VerifyOtpFormValues,
 } from "@/app/lib/schemas";
+import posthog from "posthog-js";
 
 export default function VerifyPage() {
   const router = useRouter();
@@ -43,15 +44,19 @@ export default function VerifyPage() {
     setServerError(null);
     setInfo(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.verifyOtp({
+    const { error, data } = await supabase.auth.verifyOtp({
       phone,
       token: code,
       type: "sms",
     });
     if (error) {
+      posthog.capture("otp_verification_failed", { phone, error: error.message });
       setServerError(error.message);
       return;
     }
+    const userId = data.user?.id ?? phone;
+    posthog.identify(userId, { phone });
+    posthog.capture("otp_verified", { phone });
     router.replace(redirectTo);
     router.refresh();
   });

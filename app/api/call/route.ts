@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { callRequestSchema, parseJsonBody } from "@/app/lib/schemas";
 import { createClient } from "@/app/lib/supabase/server";
 import { createAdminClient } from "@/app/lib/supabase/admin";
+import { getPostHogClient } from "@/app/lib/posthog-server";
 
 export const runtime = "nodejs";
 
@@ -153,11 +154,31 @@ export async function POST(req: Request) {
   if (!hrRes.ok) {
     // Roll back the session row — the call didn't actually start.
     await admin.from("call_sessions").delete().eq("id", sessionId);
+    const posthog = getPostHogClient();
+    posthog.capture({
+      distinctId: user.id,
+      event: "call_trigger_failed",
+      properties: {
+        session_id: sessionId,
+        status: hrRes.status,
+      },
+    });
     return NextResponse.json(
       { error: `HappyRobot ${hrRes.status}`, details: hrData },
       { status: hrRes.status },
     );
   }
+
+  const posthog = getPostHogClient();
+  posthog.capture({
+    distinctId: user.id,
+    event: "call_initiated",
+    properties: {
+      session_id: sessionId,
+      phone_number,
+      remaining_questions: remainingQuestions.split("\n").filter(Boolean).length,
+    },
+  });
 
   return NextResponse.json({ sessionId, webhook_url, hr: hrData });
 }

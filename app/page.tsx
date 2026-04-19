@@ -7,6 +7,7 @@ import {
   type Person,
 } from "./lib/data";
 import { createClient } from "./lib/supabase/client";
+import posthog from "posthog-js";
 
 const ACCENTS = [
   "bg-pink text-white",
@@ -157,6 +158,7 @@ export default function Home() {
     if (liveStatus === "calling" || liveStatus === "live") return;
     setLiveError(null);
     setLiveStatus("calling");
+    posthog.capture("call_requested", { phone: me.phone });
     try {
       const res = await fetch("/api/call", {
         method: "POST",
@@ -169,6 +171,11 @@ export default function Home() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
+        posthog.capture("call_failed", {
+          phone: me.phone,
+          error: typeof data?.error === "string" ? data.error : "unknown",
+          status: res.status,
+        });
         setLiveStatus("error");
         setLiveError(
           typeof data?.error === "string"
@@ -178,6 +185,7 @@ export default function Home() {
         return;
       }
       if (data?.allAnswered) {
+        posthog.capture("call_all_answered", { phone: me.phone });
         setLiveStatus("idle");
         setLiveError("You've already answered every question. Thanks!");
         return;
@@ -185,6 +193,12 @@ export default function Home() {
       setLiveStatus("live");
     } catch (err) {
       console.error("[call] start failed", err);
+      posthog.capture("call_failed", {
+        phone: me.phone,
+        error: err instanceof Error ? err.message : "unknown",
+        status: null,
+      });
+      posthog.captureException(err);
       setLiveStatus("error");
       setLiveError("Couldn't start the call. Please try again.");
     }

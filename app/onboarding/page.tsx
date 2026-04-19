@@ -11,6 +11,7 @@ import {
   ALLOWED_PICTURE_MIME,
   MAX_PICTURE_BYTES,
 } from "@/app/lib/schemas";
+import posthog from "posthog-js";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -57,6 +58,10 @@ export default function OnboardingPage() {
       setServerError(res.error);
       return;
     }
+    posthog.capture("onboarding_completed", {
+      has_profile_picture: !!file,
+      has_linkedin_url: !!linkedinUrl,
+    });
     router.replace(redirectTo);
     router.refresh();
   });

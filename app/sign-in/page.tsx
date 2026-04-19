@@ -9,6 +9,7 @@ import {
   signInFormSchema,
   type SignInFormValues,
 } from "@/app/lib/schemas";
+import posthog from "posthog-js";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -34,6 +35,7 @@ export default function SignInPage() {
       setServerError(error.message);
       return;
     }
+    posthog.capture("sign_in_otp_requested", { phone });
     const params = new URLSearchParams({ phone });
     if (redirectTo && redirectTo !== "/") params.set("redirect", redirectTo);
     router.push(`/sign-in/verify?${params.toString()}`);

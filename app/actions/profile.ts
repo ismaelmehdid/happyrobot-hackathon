@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/app/lib/supabase/server";
 import { createAdminClient } from "@/app/lib/supabase/admin";
+import { getPostHogClient } from "@/app/lib/posthog-server";
 import {
   ALLOWED_PICTURE_MIME,
   MAX_PICTURE_BYTES,
@@ -145,6 +146,10 @@ export async function deleteAccount(): Promise<void> {
   if (error) {
     throw new Error(`Couldn't delete account: ${error.message}`);
   }
+
+  const posthog = getPostHogClient();
+  posthog.capture({ distinctId: user.id, event: "account_deleted" });
+  await posthog.shutdown();
 
   await supabase.auth.signOut();
   redirect("/sign-in");

@@ -7,6 +7,7 @@ import {
   webhookBodySchema,
 } from "@/app/lib/schemas";
 import { createAdminClient } from "@/app/lib/supabase/admin";
+import { getPostHogClient } from "@/app/lib/posthog-server";
 
 export const runtime = "nodejs";
 
@@ -62,6 +63,18 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
+
+  const posthog = getPostHogClient();
+  posthog.capture({
+    distinctId: session.user_id,
+    event: "answer_recorded",
+    properties: {
+      question_id,
+      choice,
+      raw_answer: raw_answer ?? answer,
+      session_id: sessionId,
+    },
+  });
 
   return NextResponse.json({ ok: true });
 }
