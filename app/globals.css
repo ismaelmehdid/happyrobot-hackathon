@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+:root {
+  --konbini-pink: #ff0066;
+  --konbini-yellow: #ffe500;
+  --konbini-bg: #f5f0e8;
+  --konbini-ink: #0a0a0a;
+}
+
+@theme inline {
+  --color-background: var(--konbini-bg);
+  --color-foreground: var(--konbini-ink);
+  --color-pink: var(--konbini-pink);
+  --color-yellow: var(--konbini-yellow);
+  --color-ink: var(--konbini-ink);
+  --color-cream: var(--konbini-bg);
+  --font-display: var(--font-anton);
+  --font-sans: var(--font-inter);
+}
+
+html, body {
+  background: var(--konbini-bg);
+  color: var(--konbini-ink);
+}
+
+body {
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+}
+
+.display {
+  font-family: var(--font-anton), Impact, sans-serif;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.marquee-track {
+  animation: marquee 40s linear infinite;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* Fires once when an answer slot flips from "waiting" to "answered". */
+.answer-pop {
+  animation: answer-pop 520ms cubic-bezier(0.22, 1.4, 0.36, 1) both;
+}
+
+@keyframes answer-pop {
+  0%   { transform: scale(0.6) rotate(-6deg); opacity: 0; }
+  55%  { transform: scale(1.15) rotate(2deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}

@@ -1,0 +1,83 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+!.env.template
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# clerk configuration (can include secrets)
+/.clerk/
+
+# supabase cli local state (can include service role keys)
+/.supabase/
+/supabase/.temp/
+/supabase/.env
+
+# turbopack cache
+/.turbo/
+
+# editor / IDE
+/.vscode/
+/.idea/
+*.swp
+*.swo
+*~
+.history/
+
+# AI assistant local state
+/.claude/
+/.cursor/
+/.agents/
+skills-lock.json
+
+# logs
+*.log
+logs/
+*.log.*
+
+# os
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# local scratch
+/tmp/
+/.tmp/
+.cache/
