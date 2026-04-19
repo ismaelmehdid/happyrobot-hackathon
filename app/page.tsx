@@ -77,17 +77,19 @@ export default function Home() {
   useEffect(() => {
     const supabase = createClient();
     let cancelled = false;
-
-    ensureSeeded().then(({ list }) => {
-      if (cancelled) return;
-      setPeople(list);
-      setHydrated(true);
-    });
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
     // Gate Realtime on the auth session — the websocket must send the user's
     // access_token, otherwise RLS evaluates the subscription as anon and
-    // silently drops every change event.
-    const setup = async () => {
+    // silently drops every change event. subscribe() MUST run after setAuth()
+    // or the race leaves the channel joined as anon (SUBSCRIBED, but filtered).
+    (async () => {
+      ensureSeeded().then(({ list }) => {
+        if (cancelled) return;
+        setPeople(list);
+        setHydrated(true);
+      });
+
       const { data: sessionData } = await supabase.auth.getSession();
       if (cancelled) return;
       const session = sessionData.session;
@@ -112,7 +114,7 @@ export default function Home() {
             realName,
             profilePicture: meta?.profile_picture_url,
           });
-        supabase.realtime.setAuth(session.access_token);
+        await supabase.realtime.setAuth(session.access_token);
       }
 
       const { data: initial, error } = await supabase
@@ -124,32 +126,29 @@ export default function Home() {
       } else {
         setAnswers((initial as AnswerRow[]) ?? []);
       }
-    };
 
-    setup();
-
-    // Single channel: react to any change by re-fetching the small table.
-    const channel = supabase
-      .channel("answers-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "answers" },
-        async (payload) => {
-          console.log("[realtime] answers event", payload);
-          const { data } = await supabase
-            .from("answers")
-            .select("user_id, question_id, choice");
-          if (cancelled) return;
-          setAnswers((data as AnswerRow[]) ?? []);
-        },
-      )
-      .subscribe((status) => {
-        console.log("[realtime] answers channel →", status);
-      });
+      channel = supabase
+        .channel("answers-changes")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "answers" },
+          async (payload) => {
+            console.log("[realtime] answers event", payload);
+            const { data } = await supabase
+              .from("answers")
+              .select("user_id, question_id, choice");
+            if (cancelled) return;
+            setAnswers((data as AnswerRow[]) ?? []);
+          },
+        )
+        .subscribe((status) => {
+          console.log("[realtime] answers channel →", status);
+        });
+    })();
 
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, []);
 
