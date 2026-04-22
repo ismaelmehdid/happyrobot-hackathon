@@ -43,7 +43,7 @@ insert into questions (id, position, label, option_a, option_b) values
   ('q3',  3,  'Favorite AI',   'Claude',              'ChatGPT'),
   ('q4',  4,  'Team',          'Founder',             'VC'),
   ('q5',  5,  'Who ships it',  'AI',                  'Human'),
-  ('q6',  6,  'Cash',          'Bootstrap (Mickey)',  'VC money (Evil)'),
+  ('q6',  6,  'Dev experience', 'Vibe coded deeptech', 'Over engineered SaaS'),
   ('q7',  7,  'Incubator',     'Station F',           'YC'),
   ('q8',  8,  'A lie',         'Lying to your board', 'Lying to your mom'),
   ('q9',  9,  'Toilets',       'YC',                  'WC'),
