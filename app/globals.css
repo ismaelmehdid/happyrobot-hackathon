@@ -21,6 +21,8 @@
 html, body {
   background: var(--konbini-bg);
   color: var(--konbini-ink);
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 body {

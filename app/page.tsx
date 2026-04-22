@@ -243,13 +243,13 @@ export default function Home() {
   const isCalling = liveStatus === "calling" || liveStatus === "live";
 
   return (
-    <div className="max-w-[1400px] mx-auto px-6 py-10">
+    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 sm:py-10">
       {/* Hero */}
-      <section className="border-2 border-ink bg-ink text-cream p-8 mb-6 relative overflow-hidden">
+      <section className="border-2 border-ink bg-ink text-cream p-5 sm:p-8 mb-6 relative overflow-hidden">
         <span className="display text-sm bg-yellow text-ink px-2 py-1 inline-block mb-3">
           THE VERDICT
         </span>
-        <h1 className="display text-5xl md:text-7xl leading-[0.9]">
+        <h1 className="display text-4xl sm:text-5xl md:text-7xl leading-[0.9] break-words">
           THE FRENCH TECH
           <br />
           <span className="text-pink">HAS SPOKEN</span>
@@ -538,18 +538,18 @@ function LiveCallPopup({
   const qIndex = activeIndex === -1 ? total - 1 : activeIndex;
 
   return (
-    <div className="fixed inset-0 z-50 bg-ink/70 flex items-center justify-center p-6">
-      <div className="w-full max-w-4xl border-2 border-ink bg-cream max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-ink/70 flex items-center justify-center p-3 sm:p-6">
+      <div className="w-full max-w-4xl border-2 border-ink bg-cream max-h-[90vh] overflow-y-auto overflow-x-hidden">
         {/* Header strip */}
-        <section className="bg-ink text-cream p-5 flex items-center gap-4">
+        <section className="bg-ink text-cream p-4 sm:p-5 flex items-center gap-3 sm:gap-4">
           <div className="flex-1 min-w-0">
-            <div className="display text-xs text-yellow flex items-center gap-2">
+            <div className="display text-xs text-yellow flex items-center gap-2 flex-wrap">
               <span className={isDialing ? "animate-pulse" : ""}>☎ LIVE CALL</span>
               {me?.phone && (
-                <span className="opacity-60 font-mono">— {me.phone}</span>
+                <span className="opacity-60 font-mono truncate">— {me.phone}</span>
               )}
             </div>
-            <div className="display text-3xl leading-none mt-1 truncate">
+            <div className="display text-2xl sm:text-3xl leading-none mt-1 truncate">
               {me?.name ?? "YOU"}
             </div>
           </div>
@@ -574,13 +574,13 @@ function LiveCallPopup({
         </div>
 
         {/* Stage */}
-        <section className="min-h-[420px] p-8 md:p-12 flex flex-col justify-center relative overflow-hidden">
+        <section className="min-h-[420px] p-5 sm:p-8 md:p-12 flex flex-col justify-center relative overflow-hidden">
           {isDialing && answeredCount === 0 ? (
             <div className="text-center">
               <div className="display text-sm text-pink mb-3 animate-pulse">
                 CONNECTING…
               </div>
-              <div className="display text-5xl md:text-7xl leading-[0.9]">
+              <div className="display text-4xl sm:text-5xl md:text-7xl leading-[0.9] break-words">
                 DIALING THE
                 <br />
                 NUMBER.
@@ -588,26 +588,26 @@ function LiveCallPopup({
             </div>
           ) : !isDone && q ? (
             <>
-              <div className="flex items-baseline gap-4 mb-6">
-                <span className="display text-6xl md:text-8xl text-pink leading-none">
+              <div className="flex items-baseline gap-3 sm:gap-4 mb-6 min-w-0">
+                <span className="display text-5xl sm:text-6xl md:text-8xl text-pink leading-none shrink-0">
                   {String(qIndex + 1).padStart(2, "0")}
                 </span>
-                <div>
+                <div className="min-w-0">
                   <div className="display text-xs opacity-70">{q.label}</div>
-                  <div className="display text-3xl md:text-5xl leading-tight">
+                  <div className="display text-2xl sm:text-3xl md:text-5xl leading-tight break-words">
                     {q.a} <span className="text-pink">vs</span> {q.b}
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="border-2 border-ink bg-cream p-6 min-h-[120px] flex items-center justify-center text-center display text-2xl md:text-3xl leading-tight">
+                <div className="border-2 border-ink bg-cream p-5 sm:p-6 min-h-[120px] flex items-center justify-center text-center display text-xl sm:text-2xl md:text-3xl leading-tight break-words">
                   <div>
                     <div className="display text-xs opacity-60 mb-1">A</div>
                     {q.a}
                   </div>
                 </div>
-                <div className="border-2 border-ink bg-cream p-6 min-h-[120px] flex items-center justify-center text-center display text-2xl md:text-3xl leading-tight">
+                <div className="border-2 border-ink bg-cream p-5 sm:p-6 min-h-[120px] flex items-center justify-center text-center display text-xl sm:text-2xl md:text-3xl leading-tight break-words">
                   <div>
                     <div className="display text-xs opacity-60 mb-1">B</div>
                     {q.b}
@@ -620,9 +620,9 @@ function LiveCallPopup({
               </div>
             </>
           ) : (
-            <div className="absolute inset-0 bg-yellow flex flex-col items-center justify-center p-8 text-center">
+            <div className="absolute inset-0 bg-yellow flex flex-col items-center justify-center p-5 sm:p-8 text-center">
               <div className="display text-sm mb-2">CALL COMPLETE</div>
-              <div className="display text-6xl md:text-8xl leading-[0.9]">
+              <div className="display text-4xl sm:text-6xl md:text-8xl leading-[0.9] break-words">
                 {total} ANSWERS
                 <br />
                 IN THE BAG.

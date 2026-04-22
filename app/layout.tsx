@@ -68,16 +68,16 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col bg-cream text-ink">
         {showChrome && user && (
           <header className="border-b-2 border-ink bg-cream sticky top-0 z-40">
-            <div className="max-w-[1400px] mx-auto flex items-center justify-between px-6 py-4">
-              <Link href="/" className="flex items-center gap-3">
-                <span className="display text-3xl leading-none bg-ink text-yellow px-3 py-1">
+            <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-3 flex-wrap px-4 sm:px-6 py-3 sm:py-4">
+              <Link href="/" className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <span className="display text-2xl sm:text-3xl leading-none bg-ink text-yellow px-2 sm:px-3 py-1 shrink-0">
                   K
                 </span>
-                <span className="display text-2xl leading-none tracking-wide">
+                <span className="display text-lg sm:text-2xl leading-none tracking-wide truncate">
                   KONBINI <span className="text-pink">/</span> HAPPY ROBOT
                 </span>
               </Link>
-              <nav className="flex items-center gap-2">
+              <nav className="flex items-center gap-2 flex-wrap justify-end min-w-0">
                 <Link
                   href="/"
                   className="display text-sm px-3 py-2 border-2 border-ink bg-pink text-white hover:bg-ink transition-colors"
@@ -85,10 +85,10 @@ export default async function RootLayout({
                   Dashboard
                 </Link>
                 <div
-                  className="flex items-center gap-2 border-2 border-ink px-2 py-1 bg-cream"
+                  className="flex items-center gap-2 border-2 border-ink px-2 py-1 bg-cream min-w-0"
                   title={meta?.linkedin_url ?? user.phone ?? user.email ?? ""}
                 >
-                  <span className="w-8 h-8 border-2 border-ink bg-yellow display text-xs flex items-center justify-center overflow-hidden relative">
+                  <span className="w-8 h-8 border-2 border-ink bg-yellow display text-xs flex items-center justify-center overflow-hidden relative shrink-0">
                     {profilePicture ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -100,7 +100,7 @@ export default async function RootLayout({
                       initialsOf(displayName)
                     )}
                   </span>
-                  <span className="display text-sm max-w-[180px] truncate">
+                  <span className="display text-sm max-w-[120px] sm:max-w-[180px] truncate">
                     {displayName}
                   </span>
                 </div>
@@ -134,7 +134,7 @@ export default async function RootLayout({
         <main className="flex-1">{children}</main>
         {showChrome && user && (
           <footer className="border-t-2 border-ink bg-ink text-cream py-6">
-            <div className="max-w-[1400px] mx-auto px-6 flex flex-wrap items-center justify-between gap-4">
+            <div className="max-w-[1400px] mx-auto px-4 sm:px-6 flex flex-wrap items-center justify-between gap-4">
               <span className="display text-lg">© KONBINI HAPPY ROBOT — NOT A REAL MEDIA</span>
               <span className="text-xs opacity-70">Made with AI calls & bad coffee.</span>
               <DeleteAccountButton />
