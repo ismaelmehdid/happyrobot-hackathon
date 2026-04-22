@@ -31,10 +31,15 @@ type AnswerRow = {
 };
 
 function questionsForAgent(): string {
-  return QUESTIONS.map(
-    (q) =>
-      `[${q.id}] ${q.label}: Option A « ${q.a} » — Option B « ${q.b} »`,
-  ).join("\n");
+  return QUESTIONS.map((q) => {
+    const aliasesA = q.aliasesA?.length
+      ? ` (accept as A: ${q.aliasesA.map((s) => `"${s}"`).join(", ")})`
+      : "";
+    const aliasesB = q.aliasesB?.length
+      ? ` (accept as B: ${q.aliasesB.map((s) => `"${s}"`).join(", ")})`
+      : "";
+    return `[${q.id}] ${q.label}: Option A « ${q.a} »${aliasesA} — Option B « ${q.b} »${aliasesB}`;
+  }).join("\n");
 }
 
 function LinkedInIcon({ className }: { className?: string }) {

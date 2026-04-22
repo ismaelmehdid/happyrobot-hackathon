@@ -11,8 +11,24 @@ export const runtime = "nodejs";
 // "pass", silence, or any non-A/non-B response — it has to re-ask until the
 // caller picks one of the two options. Without this the webhook silently
 // drops skipped answers and the user ends up with holes in their sheet.
-const NO_SKIP_INSTRUCTION =
-  "STRICT RULE: every question below must be answered with either option A or option B. Do not accept skipping, 'pass', 'I don't know', 'neither', silence, or any other response — politely re-ask the same question until you have a clear A or B. Do not advance to the next question without a valid A/B answer for the current one, and do not end the call until every question has an A or B answer.";
+//
+// ALIAS MAPPING: each question line ships with "(accept as A: ...)" and
+// "(accept as B: ...)" hint lists. Any phonetic / semantic variant in those
+// lists — even if mistranscribed — must be mapped to the corresponding letter
+// without asking the caller to repeat. This is what rescues brand names like
+// "Claude" (often heard as "cloud") and "ChatGPT" (often heard as "GPT" alone).
+//
+// LETTER FALLBACK: if after ONE re-ask the answer is still not clearly A or B
+// and no alias matches, the agent pivots and asks the caller to simply say the
+// letter "A" or the letter "B". Letters are phonetically orthogonal and kill
+// the ambiguity. Do not loop on the option names more than twice.
+const NO_SKIP_INSTRUCTION = [
+  "STRICT RULE: every question below must be answered with either option A or option B.",
+  "Do not accept skipping, 'pass', 'I don't know', 'neither', silence, or any other response — politely re-ask the same question until you have a clear A or B. Do not advance to the next question without a valid A/B answer for the current one, and do not end the call until every question has an A or B answer.",
+  "ALIAS HANDLING: each question includes '(accept as A: ...)' and '(accept as B: ...)' hint lists of phonetic and semantic variants. If the caller's answer matches ANY entry in one of those lists — even a mistranscribed variant — record that letter immediately and move on. Do not ask them to repeat, do not ask them to confirm, just accept it.",
+  "LETTER FALLBACK: if the caller's answer does not match either alias list and is not clearly A or B, re-ask ONCE using the option names. If the second answer is still ambiguous, switch the question and ask them to simply say the letter — 'just say A or B' — and accept whichever letter they say.",
+  "NEVER ask the caller to confirm their answer ('did you say X?'). Keep the call fast and punchy — Konbini style, no hand-holding.",
+].join(" ");
 
 const WORKFLOW_SLUG = process.env.HAPPYROBOT_WORKFLOW_SLUG ?? "2wp08hzdnbu6";
 const HR_BASE_URL =
