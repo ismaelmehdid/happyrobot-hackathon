@@ -432,54 +432,45 @@ export default function Home() {
         </h2>
       </section>
 
-      <section className="grid grid-cols-1 gap-3 mb-10">
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-10">
         {stats.map((s, i) => (
-          <div key={s.q.id} className="border-2 border-ink bg-cream p-5">
-            <div className="flex items-baseline gap-3 mb-3">
-              <span className="display text-4xl text-pink leading-none">
+          <div key={s.q.id} className="border-2 border-ink overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 py-2 border-b-2 border-ink bg-cream">
+              <span className="display text-2xl text-pink leading-none">
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <div className="flex-1">
-                <div className="display text-xs opacity-70">{s.q.label}</div>
-                <div className="display text-2xl leading-tight">
-                  {s.q.a} <span className="text-pink">vs</span> {s.q.b}
-                </div>
-              </div>
-              <div className="display text-xs border-2 border-ink px-2 py-1">
+              <span className="display text-xs opacity-70 flex-1">{s.q.label}</span>
+              <span className="display text-xs border-2 border-ink px-2 py-1">
                 {s.total} vote{s.total > 1 ? "s" : ""}
+              </span>
+            </div>
+
+            {/* Option A — white background */}
+            <div className="bg-white p-6 border-b-2 border-ink flex flex-col items-center justify-center min-h-[120px] text-center">
+              {s.total > 0 && <div className="display text-[10px] opacity-40 mb-1">{s.aPct}%</div>}
+              <div className="display text-4xl sm:text-5xl leading-none uppercase font-black text-ink break-words">
+                {s.q.a}
               </div>
             </div>
 
-            {s.total === 0 ? (
-              <div className="display text-sm border-2 border-dashed border-ink/30 p-6 text-center opacity-60">
-                No answers yet.
+            {/* Option B — black background */}
+            <div className="bg-ink p-6 flex flex-col items-center justify-center min-h-[120px] text-center">
+              {s.total > 0 && <div className="display text-[10px] opacity-40 mb-1 text-cream">{s.bPct}%</div>}
+              <div className="display text-4xl sm:text-5xl leading-none uppercase font-black text-cream break-words">
+                {s.q.b}
               </div>
-            ) : (
-              <>
-                <div className="flex border-2 border-ink h-12 overflow-hidden">
-                  <div
-                    className="bg-yellow text-ink display flex items-center px-3 transition-all duration-500"
-                    style={{ width: `${s.aPct}%` }}
-                  >
-                    {s.aPct >= 10 ? `${s.aPct}%` : ""}
-                  </div>
-                  <div
-                    className="bg-pink text-white display flex items-center justify-end px-3 transition-all duration-500"
-                    style={{ width: `${s.bPct}%` }}
-                  >
-                    {s.bPct >= 10 ? `${s.bPct}%` : ""}
-                  </div>
-                </div>
-                <div className="flex justify-between text-xs mt-2 display">
-                  <span>
-                    A · {s.q.a} <span className="opacity-60">({s.a})</span>
-                  </span>
-                  <span>
-                    <span className="opacity-60">({s.b})</span> {s.q.b} · B
-                  </span>
-                </div>
-              </>
-            )}
+            </div>
+
+            {/* Colorful stripe */}
+            <div className="flex h-2">
+              <div className="flex-1 bg-yellow" />
+              <div className="flex-1 bg-[#2563EB]" />
+              <div className="flex-1 bg-pink" />
+              <div className="flex-1 bg-[#2563EB]" />
+              <div className="flex-1 bg-yellow" />
+              <div className="flex-1 bg-pink" />
+            </div>
           </div>
         ))}
       </section>
