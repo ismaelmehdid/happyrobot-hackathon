@@ -7,6 +7,7 @@ import {
   type Person,
 } from "./lib/data";
 import { createClient } from "./lib/supabase/client";
+import { resetMyAnswers } from "./actions/answers";
 import posthog from "posthog-js";
 
 const ACCENTS = [
@@ -78,6 +79,8 @@ export default function Home() {
 
   const [liveStatus, setLiveStatus] = useState<LiveStatus>("idle");
   const [liveError, setLiveError] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -209,6 +212,22 @@ export default function Home() {
     setLiveStatus("idle");
   }
 
+  async function doReset() {
+    if (resetting) return;
+    setResetting(true);
+    try {
+      const res = await resetMyAnswers();
+      if (!res.ok) {
+        setLiveError(res.error ?? "Failed to reset");
+      } else {
+        posthog.capture("answers_reset");
+      }
+    } finally {
+      setResetting(false);
+      setConfirmReset(false);
+    }
+  }
+
   const stats = useMemo(() => {
     const byQuestion = new Map<string, { a: number; b: number }>();
     for (const row of answers) {
@@ -313,6 +332,14 @@ export default function Home() {
                 📞 Call me
               </button>
             )}
+            <button
+              onClick={() => setConfirmReset(true)}
+              disabled={!me || isCalling || myAnswers.size === 0}
+              className="display text-sm border-2 border-ink px-4 py-3 bg-cream text-ink hover:bg-ink hover:text-yellow disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Wipe your own answers and start fresh"
+            >
+              ⟲ Reset
+            </button>
           </div>
         </div>
 
@@ -516,6 +543,42 @@ export default function Home() {
 
       {/* Live call popup — visible while dialing / on air */}
       {isCalling && <LiveCallPopup me={me} myAnswers={myAnswers} liveStatus={liveStatus} onClose={stopLiveCall} />}
+
+      {confirmReset && (
+        <div className="fixed inset-0 z-50 bg-ink/70 flex items-center justify-center p-4">
+          <div className="w-full max-w-md border-2 border-ink bg-cream">
+            <div className="bg-ink text-cream p-4">
+              <div className="display text-xs text-yellow">ARE YOU SURE?</div>
+              <div className="display text-3xl leading-none mt-1">
+                RESET ALL<br />
+                <span className="text-pink">YOUR ANSWERS</span>
+              </div>
+            </div>
+            <div className="p-5">
+              <p className="text-sm opacity-80">
+                This wipes every answer you&apos;ve submitted so far. You can call
+                back and answer them again. Cannot be undone.
+              </p>
+            </div>
+            <div className="border-t-2 border-ink flex">
+              <button
+                onClick={() => setConfirmReset(false)}
+                disabled={resetting}
+                className="flex-1 display text-sm px-4 py-3 bg-cream border-r-2 border-ink hover:bg-yellow disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={doReset}
+                disabled={resetting}
+                className="flex-1 display text-sm px-4 py-3 bg-pink text-white hover:bg-ink disabled:opacity-40"
+              >
+                {resetting ? "Resetting…" : "Yes, reset"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
