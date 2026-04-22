@@ -335,10 +335,10 @@ export default function Home() {
             <button
               onClick={() => setConfirmReset(true)}
               disabled={!me || isCalling || myAnswers.size === 0}
-              className="display text-sm border-2 border-ink px-4 py-3 bg-cream text-ink hover:bg-ink hover:text-yellow disabled:opacity-40 disabled:cursor-not-allowed"
+              className="display text-base border-2 border-ink px-5 py-3 bg-yellow text-ink hover:bg-ink hover:text-yellow disabled:opacity-40 disabled:cursor-not-allowed"
               title="Wipe your own answers and start fresh"
             >
-              ⟲ Reset
+              ⟲ RESET
             </button>
           </div>
         </div>
